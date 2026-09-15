@@ -9,31 +9,51 @@
 <body>
   <header class="topbar">
     <h1>语音样本录制 · 管理端</h1>
-    <p class="subtitle">查看所有已提交的录音，可试听、下载。</p>
+    <p class="subtitle">查看所有已提交的录音，可搜索、试听、下载。</p>
   </header>
 
   <main class="container">
     <div id="global-alert" class="alert alert-error hidden" role="alert"></div>
+    <div id="global-notice" class="alert alert-info hidden" role="status"></div>
 
     <!-- 登录 -->
-    <section id="login-panel" class="card">
-      <h2>管理端登录</h2>
+    <section id="login-panel" class="card" aria-labelledby="login-heading">
+      <h2 id="login-heading" tabindex="-1">管理端登录</h2>
       <form id="login-form" class="form-row" autocomplete="off">
         <label for="code-input" class="sr-only">管理端口令</label>
         <input id="code-input" type="password" placeholder="请输入管理端口令" autocomplete="off">
         <button type="submit" id="login-submit" class="primary">登录</button>
       </form>
-      <p id="login-error" class="field-error hidden"></p>
+      <p id="login-error" class="field-error hidden" role="alert"></p>
     </section>
 
     <!-- 列表 -->
-    <section id="list-panel" class="hidden">
+    <section id="list-panel" class="hidden" aria-labelledby="list-heading">
+      <h2 id="list-heading" class="sr-only" tabindex="-1">提交记录列表</h2>
+
       <div class="list-toolbar card">
         <div class="list-summary">
-          <strong id="count-text">共 0 条提交记录</strong>
+          <strong id="count-text" role="status">共 0 条提交记录</strong>
           <span id="updated-text" class="hint"></span>
         </div>
         <div class="list-actions">
+          <label class="control-field">
+            <span class="sr-only">按姓名搜索</span>
+            <input id="search-input" type="search" placeholder="搜索姓名…" autocomplete="off">
+          </label>
+          <label class="control-field">
+            <span class="sr-only">排序方式</span>
+            <select id="sort-select">
+              <option value="updated-desc">最近更新优先</option>
+              <option value="first-desc">首次提交优先</option>
+              <option value="name-asc">按姓名排序</option>
+            </select>
+          </label>
+          <label class="switch-field">
+            <input id="auto-refresh" type="checkbox" checked>
+            <span>自动刷新</span>
+          </label>
+          <button type="button" id="copy-url-button">复制员工入口</button>
           <button type="button" id="refresh-button">刷新</button>
           <button type="button" id="logout-button">退出登录</button>
         </div>
@@ -41,7 +61,15 @@
 
       <div id="empty-state" class="card empty-state hidden">
         <p>还没有任何员工提交录音。</p>
-        <p class="hint">把员工端地址发给同事即可开始收集：<code id="employee-url"></code></p>
+        <p class="hint">把员工端地址发给同事即可开始收集：</p>
+        <p class="empty-url">
+          <code id="employee-url"></code>
+          <button type="button" id="copy-url-empty" class="link-button">复制</button>
+        </p>
+      </div>
+
+      <div id="empty-filter" class="card empty-state hidden">
+        <p id="empty-filter-text">没有匹配的记录。</p>
       </div>
 
       <div id="table-wrapper" class="table-wrapper hidden">

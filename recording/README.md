@@ -13,6 +13,13 @@
 | 员工端 | `http://localhost:3000/` | 公司员工 | 输口令 → 填姓名 → 录中文、英文两段 → 提交 |
 | 管理端 | `http://localhost:3000/admin.html` | 管理员 | 输管理口令 → 查看所有已提交记录、试听、下载 |
 
+员工端录音时有实时计时、目标进度与输入电平，静音会即时提醒；提交有真实进度、
+可取消、失败可重试。姓名会在本机浏览器里记住（下次自动填入，存在 `localStorage`，
+口令绝不保存），进入录音步后也可以返回修改姓名且不丢已录内容。
+
+管理端支持按姓名搜索、三种排序、可关闭的自动刷新（30 秒一次，切到后台自动暂停）、
+相对时间显示、"偏短"标记与一键复制员工入口地址。
+
 ## 前置条件
 
 有两条路：**本机直接跑**（开发调试方便）和 **Docker**（部署 / 给别人用）。
@@ -103,24 +110,16 @@ data/
 `Dockerfile` 和 `docker-compose.yml` 已经备好。**镜像内已装好 ffmpeg**，
 所以走 Docker 不需要在 Mac 上装 Node 或 ffmpeg。
 
-> **验证状态（重要）**：本项目开发环境**无法访问 Docker**（沙箱与宿主隔离，
-> 且 Docker Hub 不可达），所以**镜像没有真正 build 过**。
->
-> 但构建里最容易出问题的两步已经单独复现验证过：
->
-> 1. 只用 `package.json` + `package-lock.json`（不带 `node_modules`）跑
->    `npm ci --omit=dev` —— **成功**，装出 `busboy` + `streamsearch` 两个包，0 漏洞。
->    这同时证明 `package-lock.json` 与 `package.json` 是同步的。
-> 2. 只保留 `server/`、`public/`、`content/` 三个目录（Dockerfile 的 COPY 清单），
->    以 `NODE_ENV=production` + 绝对路径 `DATA_DIR` 启动 —— **成功**，
->    上传 → ffmpeg 转码 → `pcm_s16le/16000Hz/单声道`，静态资源与公开接口均正常。
->    代码里唯一的 `ROOT_DIR` 外部引用是 `.env`，而它是可选的，不影响容器模式。
->
-> **仍未验证的是容器的"管道"部分**：Docker 自身的构建/运行机制、
-> `USER node` 与宿主 volume 属主是否冲突。
-> 相比之下，基础镜像与 ffmpeg 包已经另行确认过：镜像层能从国内加速站完整拉取，
-> `deb.debian.org` 上存在 bookworm/arm64 的 `ffmpeg 5.1.9-0+deb12u1`。
-> 首次使用请自行 `docker compose up --build` 确认。
+> **验证状态（2026-09-15 已实际构建并验证）**：宿主机用 Docker Desktop
+> （4.90.0 / engine 29.7.2，macOS arm64）完成 `docker compose build` 与
+> `docker compose up -d`，容器 **healthy**；镜像内 `ffmpeg 5.1.9-0+deb12u1`、
+> Node v22.23.2。实测通过：新前端由容器正常提供；员工端录音/停止/时长判定；
+> 管理端登录、列表与搜索；一次性容器 + 临时数据卷的完整提交
+> （上传 → 转码 → `pcm_s16le/16000Hz/单声道` 落盘）正常。
+> 此前记录的「沙箱无法访问 Docker」只反映当时的 Agent 环境，
+> 构建与运行机制、`USER node` 与 macOS 卷属主这三项现已验证；
+> 仍待确认的只有 CI 配置位置与内网/HTTPS 部署（见 `constitution/tech-stack.md` 待确认项）。
+> 换到新机器或用新配置首次部署时，仍建议 `docker compose up -d --build` 后再确认一次。
 
 ### 用 compose（推荐）
 

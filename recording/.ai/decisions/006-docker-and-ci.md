@@ -127,3 +127,22 @@ bookworm/arm64 的 `ffmpeg 5.1.9-0+deb12u1`。加上「补充二」的复现结�
   因为 `PORT` 是给本机 `npm start` 用的，compose 也会读同一个 `.env` 做变量替换，
   两者混用会导致「改了 PORT、容器映射跟着变但容器内监听端口没变」这种难查的错。
 - 健康检查直接打公开的 `/api/config`，不为此新增接口。
+
+## 补充四：镜像已在宿主机实际构建并验证（2026-09-15）
+
+用户要求直接重建并验证。宿主机 Docker Desktop 可用（4.90.0 / engine 29.7.2，
+macOS arm64），此前"无法在沙箱内验证"的结论就此结束。实测结果：
+
+| 项 | 结果 |
+|---|---|
+| `docker compose build` | ✅ 成功（增量重建，`COPY public/` 层更新） |
+| `docker compose up -d` | ✅ 容器 `healthy`（healthcheck 打 `/api/config`） |
+| 镜像内运行时 | ✅ `ffmpeg 5.1.9-0+deb12u1`、Node v22.23.2 |
+| 新前端（spec-002） | ✅ 由容器正常提供；浏览器实测员工端录音/停止/时长、管理端登录/列表/搜索 |
+| 端到端提交（一次性容器 + 临时卷） | ✅ 上传 → 转码 → `pcm_s16le / 16000 Hz / 单声道` 落盘 |
+| `USER node` 与宿主 volume 属主 | ✅ macOS Docker Desktop 下无冲突 |
+| 真实数据 | ✅ `./data` 卷无变化（既有记录保留） |
+
+因此「补充二/补充三」中列出的未验证项（基础镜像拉取、apt 装 ffmpeg、
+容器运行管道、volume 属主）**均已验证通过**。仍未决定的仍是 CI 配置位置
+（待用户拍板，见 `tech-stack.md` 待确认项 1）与内网/HTTPS 部署（待确认项 2）。

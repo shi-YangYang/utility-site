@@ -15,7 +15,7 @@
 | 前端 | 原生 HTML + CSS + JavaScript，**零构建步骤**，无打包器 |
 | 数据库 | 无。文件系统 + JSON 索引 |
 | 媒体处理 | ffmpeg（外部可执行文件，非 npm 依赖） |
-| 部署 | Docker（Dockerfile 已备，**未经实际构建验证**） |
+| 部署 | Docker（2026-09-15 已实际构建并验证运行） |
 | 测试框架 | 无 |
 
 ## 为什么这么选
@@ -127,17 +127,17 @@ npm start       # 启动服务，默认 http://localhost:3000
 - **两条运行路径，前置条件不同：**
   - **本机 `npm start`**：需要宿主装 Node 20.12+ 与 **ffmpeg**。开发调试用这条。
   - **Docker**：宿主**不需要** Node 与 ffmpeg，镜像内自带。部署 / 给别人用走这条。
-- **验证状态：镜像没有真正 build 过。** 开发环境无法访问 Docker
-  （沙箱与宿主隔离 + Docker Hub 不可达）。已用旁路方式复现验证了构建里风险最高的两步：
-  `npm ci --omit=dev` 仅凭 lockfile 可成功安装；只保留 `server/ public/ content/`
-  三个目录也能以生产环境变量正常启动、上传、转码。**未验证**的是基础镜像拉取、
-  `apt-get install ffmpeg`、`USER node` 与 volume 属主。
-- **已知未验证风险：** 镜像以非 root 的 `node` 用户（uid 1000）运行，
-  宿主 `./data` 属主不是 1000 时可能因「数据目录不可写」启动失败
-  （compose 文件里写了处置办法与逃生开关）。
+- **验证状态（2026-09-15 已实际构建并验证）**：宿主机 Docker Desktop
+  （4.90.0 / engine 29.7.2，macOS arm64）完成 `docker compose build` 与
+  `docker compose up -d`，容器 healthy（healthcheck 打 `/api/config`）；
+  镜像内 `ffmpeg 5.1.9-0+deb12u1`、Node v22.23.2。实测通过：新前端由容器正常提供、
+  员工端录音与时长判定、管理端登录/列表/搜索、一次性容器 + 临时卷的完整提交与转码
+  （`pcm_s16le / 16000 Hz / 单声道`）。`USER node` 与 macOS Docker Desktop
+  的宿主卷属主不冲突（本机验证）。此前「沙箱无法访问 Docker」的描述只反映当时的
+  Agent 环境，不再代表当前状态。
 - **国内网络的已知障碍：** Docker Hub 的鉴权服务（`auth.docker.io`）常被 DNS 污染，
   导致构建在拉基础镜像阶段就超时失败。处置办法（配 registry mirror 或走本机代理）
-  写在 `README.md` 的「拉不到基础镜像怎么办」一节。首次构建已实际遇到此问题。
+  写在 `README.md` 的「拉不到基础镜像怎么办」一节。首次构建曾实际遇到此问题。
 
 ## 待确认项（不要替用户决定）
 

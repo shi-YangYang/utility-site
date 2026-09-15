@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * 管理端逻辑：登录 → 拉取提交列表 → 试听 / 下载。
+ * 管理端逻辑：登录 → 拉取提交列表 → 搜索 / 排序 / 试听 / 下载。
  *
  * 会话靠服务端下发的 httpOnly cookie 维持，前端脚本读不到 token，
  * 也不需要自己保存任何凭据。接口返回 401 就自动退回登录态。
@@ -15,6 +15,7 @@
 
   const dom = {
     globalAlert: el('global-alert'),
+    globalNotice: el('global-notice'),
 
     loginPanel: el('login-panel'),
     loginForm: el('login-form'),
@@ -23,17 +24,45 @@
     loginError: el('login-error'),
 
     listPanel: el('list-panel'),
+    searchInput: el('search-input'),
+    sortSelect: el('sort-select'),
+    autoRefresh: el('auto-refresh'),
+    copyUrlButton: el('copy-url-button'),
     refreshButton: el('refresh-button'),
     logoutButton: el('logout-button'),
     countText: el('count-text'),
     updatedText: el('updated-text'),
     emptyState: el('empty-state'),
     employeeUrl: el('employee-url'),
+    copyUrlEmpty: el('copy-url-empty'),
+    emptyFilter: el('empty-filter'),
+    emptyFilterText: el('empty-filter-text'),
     tableWrapper: el('table-wrapper'),
     tableBody: el('table-body'),
   };
 
   const SEGMENT_ORDER = ['zh', 'en'];
+  /** 自动刷新间隔。单管理员使用，30 秒足够，且可随时关闭。 */
+  const REFRESH_INTERVAL_MS = 30 * 1000;
+  /** 相对时间的自动刷新间隔。 */
+  const TIME_REFRESH_MS = 30 * 1000;
+  const TICK_MS = 1000;
+
+  const state = {
+    employees: [],
+    /** 用于"偏短"标记的阈值，来自公开配置接口；取不到就不标记。 */
+    minSeconds: 0,
+    thresholdsLoaded: false,
+    loggedIn: false,
+    autoRefresh: true,
+    searchTerm: '',
+    sortKey: 'updated-desc',
+    lastRefreshAt: 0,
+    nextRefreshAt: 0,
+    tickId: null,
+    lastTimeRefreshAt: 0,
+    noticeTimerId: null,
+  };
 
   function showElement(node, visible) {
     if (node) node.classList.toggle('hidden', !visible);
@@ -53,6 +82,22 @@
     showElement(dom.globalAlert, false);
   }
 
+  function showNotice(message) {
+    if (state.noticeTimerId) window.clearTimeout(state.noticeTimerId);
+    setText(dom.globalNotice, message);
+    showElement(dom.globalNotice, true);
+    state.noticeTimerId = window.setTimeout(() => clearNotice(), 3000);
+  }
+
+  function clearNotice() {
+    if (state.noticeTimerId) {
+      window.clearTimeout(state.noticeTimerId);
+      state.noticeTimerId = null;
+    }
+    setText(dom.globalNotice, '');
+    showElement(dom.globalNotice, false);
+  }
+
   function showLoginError(message) {
     setText(dom.loginError, message);
     showElement(dom.loginError, true);
@@ -64,6 +109,8 @@
   }
 
   function showLogin(reason) {
+    stopTicking();
+    state.loggedIn = false;
     showElement(dom.loginPanel, true);
     showElement(dom.listPanel, false);
     if (reason) showLoginError(reason);
@@ -71,15 +118,37 @@
   }
 
   function showList() {
+    state.loggedIn = true;
     showElement(dom.loginPanel, false);
     showElement(dom.listPanel, true);
+    setText(dom.employeeUrl, `${window.location.origin}/`);
+    startTicking();
   }
 
+  // ---------------------------------------------------------------- 时间与格式
+
   function formatTime(iso) {
-    if (!iso) return '—';
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return String(iso);
-    return date.toLocaleString('zh-CN', { hour12: false });
+    const timestamp = Date.parse(iso);
+    if (!Number.isFinite(timestamp)) return '—';
+    return new Date(timestamp).toLocaleString('zh-CN', { hour12: false });
+  }
+
+  function formatRelative(iso) {
+    const timestamp = Date.parse(iso);
+    if (!Number.isFinite(timestamp)) return '—';
+    return formatRelativeFromMs(Date.now() - timestamp);
+  }
+
+  function formatRelativeFromMs(diff) {
+    if (!Number.isFinite(diff) || diff < 0) return '刚刚';
+    if (diff < 45 * 1000) return '刚刚';
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 60) return `${minutes} 分钟前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} 小时前`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days} 天前`;
+    return formatTime(new Date(Date.now() - diff).toISOString());
   }
 
   function formatDuration(seconds) {
@@ -107,7 +176,15 @@
 
     const meta = document.createElement('div');
     meta.className = 'segment-meta';
-    meta.textContent = `${label}：${formatDuration(segment.durationSec)}（${formatBytes(segment.bytes)}）`;
+    meta.appendChild(document.createTextNode(`${label}：${formatDuration(segment.durationSec)}（${formatBytes(segment.bytes)}）`));
+
+    if (state.minSeconds > 0 && Number(segment.durationSec) > 0 && Number(segment.durationSec) < state.minSeconds) {
+      const badge = document.createElement('span');
+      badge.className = 'badge badge-warn';
+      badge.textContent = '偏短';
+      badge.title = `短于要求的 ${state.minSeconds} 秒`;
+      meta.appendChild(badge);
+    }
     cell.appendChild(meta);
 
     if (segment.audioUrl) {
@@ -129,6 +206,18 @@
     return cell;
   }
 
+  function buildTimeCell(iso) {
+    const cell = document.createElement('td');
+    const time = document.createElement('time');
+    time.className = 'time';
+    time.dateTime = iso || '';
+    time.dataset.iso = iso || '';
+    time.title = formatTime(iso);
+    time.textContent = formatRelative(iso);
+    cell.appendChild(time);
+    return cell;
+  }
+
   function buildRow(employee) {
     const row = document.createElement('tr');
 
@@ -143,37 +232,118 @@
       );
     }
 
-    const firstCell = document.createElement('td');
-    firstCell.textContent = formatTime(employee.firstSubmittedAt);
-    row.appendChild(firstCell);
-
-    const updatedCell = document.createElement('td');
-    updatedCell.textContent = formatTime(employee.updatedAt);
-    row.appendChild(updatedCell);
-
+    row.appendChild(buildTimeCell(employee.firstSubmittedAt));
+    row.appendChild(buildTimeCell(employee.updatedAt));
     return row;
   }
 
-  function renderEmployees(employees) {
-    dom.tableBody.textContent = '';
-    const list = Array.isArray(employees) ? employees : [];
+  // ---------------------------------------------------------------- 过滤、排序与渲染
 
-    setText(dom.countText, `共 ${list.length} 条提交记录`);
-    setText(dom.updatedText, `最近刷新：${formatTime(new Date().toISOString())}`);
+  function sortEmployees(list) {
+    const sorted = list.slice();
+    if (state.sortKey === 'name-asc') {
+      sorted.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN'));
+    } else if (state.sortKey === 'first-desc') {
+      sorted.sort((a, b) => String(b.firstSubmittedAt || '').localeCompare(String(a.firstSubmittedAt || '')));
+    } else {
+      sorted.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+    }
+    return sorted;
+  }
 
-    if (list.length === 0) {
+  function getVisibleEmployees() {
+    const term = state.searchTerm.toLowerCase();
+    const filtered = term
+      ? state.employees.filter((employee) => String(employee.name || '').toLowerCase().includes(term))
+      : state.employees;
+    return sortEmployees(filtered);
+  }
+
+  function renderList() {
+    const total = state.employees.length;
+
+    if (state.searchTerm && total > 0) {
+      setText(dom.countText, `显示 ${getVisibleEmployees().length} / 共 ${total} 条提交记录`);
+    } else {
+      setText(dom.countText, `共 ${total} 条提交记录`);
+    }
+
+    if (total === 0) {
       showElement(dom.emptyState, true);
+      showElement(dom.emptyFilter, false);
       showElement(dom.tableWrapper, false);
-      setText(dom.employeeUrl, `${window.location.origin}/`);
+      return;
+    }
+
+    const list = getVisibleEmployees();
+    if (list.length === 0) {
+      showElement(dom.emptyState, false);
+      showElement(dom.emptyFilter, true);
+      setText(dom.emptyFilterText, `没有匹配「${state.searchTerm}」的记录。`);
+      showElement(dom.tableWrapper, false);
       return;
     }
 
     showElement(dom.emptyState, false);
+    showElement(dom.emptyFilter, false);
     showElement(dom.tableWrapper, true);
-    for (const employee of list) {
-      dom.tableBody.appendChild(buildRow(employee));
+
+    const fragment = document.createDocumentFragment();
+    for (const employee of list) fragment.appendChild(buildRow(employee));
+    dom.tableBody.textContent = '';
+    dom.tableBody.appendChild(fragment);
+  }
+
+  function updateTimes() {
+    for (const time of document.querySelectorAll('time[data-iso]')) {
+      time.textContent = formatRelative(time.dataset.iso);
+    }
+    state.lastTimeRefreshAt = Date.now();
+  }
+
+  function updateStatusLine() {
+    if (!state.lastRefreshAt) {
+      setText(dom.updatedText, '正在加载……');
+      return;
+    }
+    const refreshed = `最近刷新：${formatRelativeFromMs(Date.now() - state.lastRefreshAt)}`;
+    if (!state.autoRefresh) {
+      setText(dom.updatedText, `${refreshed} · 自动刷新已关闭`);
+      return;
+    }
+    const secondsLeft = Math.max(0, Math.ceil((state.nextRefreshAt - Date.now()) / 1000));
+    setText(dom.updatedText, `${refreshed} · 自动刷新：${secondsLeft} 秒后`);
+  }
+
+  // ---------------------------------------------------------------- 自动刷新
+
+  function startTicking() {
+    stopTicking();
+    scheduleNextRefresh();
+    state.tickId = window.setInterval(tick, TICK_MS);
+    updateStatusLine();
+  }
+
+  function stopTicking() {
+    if (state.tickId) {
+      window.clearInterval(state.tickId);
+      state.tickId = null;
     }
   }
+
+  function scheduleNextRefresh() {
+    state.nextRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
+  }
+
+  function tick() {
+    updateStatusLine();
+    if (Date.now() - state.lastTimeRefreshAt >= TIME_REFRESH_MS) updateTimes();
+    if (!state.loggedIn || !state.autoRefresh) return;
+    if (document.hidden) return;
+    if (Date.now() >= state.nextRefreshAt) loadSubmissions();
+  }
+
+  // ---------------------------------------------------------------- 数据加载
 
   async function loadSubmissions() {
     dom.refreshButton.disabled = true;
@@ -187,15 +357,35 @@
         return;
       }
       if (!response.ok) {
+        // 刷新失败不清空已有列表
         showAlert(`加载列表失败（HTTP ${response.status}）。请稍后重试。`);
         return;
       }
       const data = await response.json();
-      renderEmployees(data && data.employees);
+      state.employees = Array.isArray(data && data.employees) ? data.employees : [];
+      state.lastRefreshAt = Date.now();
+      state.lastTimeRefreshAt = Date.now();
+      renderList();
     } catch (error) {
       showAlert(`无法连接服务端：${error.message}。请检查网络后重试。`);
     } finally {
       dom.refreshButton.disabled = false;
+      scheduleNextRefresh();
+      updateStatusLine();
+    }
+  }
+
+  async function loadThresholds() {
+    if (state.thresholdsLoaded) return;
+    try {
+      const response = await fetch('/api/config', { headers: { Accept: 'application/json' } });
+      if (!response.ok) return;
+      const config = await response.json();
+      state.minSeconds = Number(config && config.minSeconds) || 0;
+      state.thresholdsLoaded = true;
+      renderList();
+    } catch {
+      // 拿不到阈值就不做"偏短"标记，不阻塞列表
     }
   }
 
@@ -209,6 +399,7 @@
       const data = await response.json();
       if (data && data.authenticated) {
         showList();
+        void loadThresholds();
         await loadSubmissions();
       } else {
         showLogin();
@@ -218,6 +409,45 @@
       showAlert(`无法连接服务端：${error.message}。请确认服务已经启动。`);
     }
   }
+
+  // ---------------------------------------------------------------- 复制入口地址
+
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // 继续走下面的回退方案
+    }
+    try {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(area);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function copyEmployeeUrl() {
+    const url = `${window.location.origin}/`;
+    const ok = await copyText(url);
+    if (ok) {
+      showNotice(`已复制员工入口：${url}`);
+    } else {
+      showAlert(`复制失败，请手动复制员工入口：${url}`);
+    }
+  }
+
+  // ---------------------------------------------------------------- 事件绑定
 
   dom.loginForm.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -239,6 +469,7 @@
       if (response.ok) {
         dom.codeInput.value = '';
         showList();
+        void loadThresholds();
         await loadSubmissions();
         return;
       }
@@ -262,8 +493,47 @@
     } catch {
       // 退出失败也无所谓，前端照样回到登录态
     }
+    state.employees = [];
     showLogin('已退出登录。');
   });
+
+  dom.searchInput.addEventListener('input', () => {
+    state.searchTerm = dom.searchInput.value.trim();
+    renderList();
+  });
+
+  dom.sortSelect.addEventListener('change', () => {
+    state.sortKey = dom.sortSelect.value;
+    renderList();
+  });
+
+  dom.autoRefresh.addEventListener('change', () => {
+    state.autoRefresh = dom.autoRefresh.checked;
+    scheduleNextRefresh();
+    updateStatusLine();
+  });
+
+  dom.copyUrlButton.addEventListener('click', copyEmployeeUrl);
+  dom.copyUrlEmpty.addEventListener('click', copyEmployeeUrl);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && state.loggedIn && state.autoRefresh) {
+      loadSubmissions();
+    }
+  });
+
+  // 试听互斥：开始播放某段时，暂停其他正在播放的播放器
+  document.addEventListener(
+    'play',
+    (event) => {
+      const target = event.target;
+      if (!target || target.tagName !== 'AUDIO') return;
+      for (const audio of document.querySelectorAll('audio')) {
+        if (audio !== target && !audio.paused) audio.pause();
+      }
+    },
+    true
+  );
 
   checkSession();
 })();

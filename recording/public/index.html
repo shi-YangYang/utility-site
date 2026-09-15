@@ -11,66 +11,96 @@
     <h1>语音样本录制</h1>
     <p class="subtitle">
       请分别朗读下面两段文字并录音，每段大约 <strong id="target-seconds">60</strong> 秒。
-      录完后可以试听、重录，两段都满意再一起提交。
+      录完可以试听、重录，两段都满意再一起提交。
     </p>
   </header>
 
   <main class="container">
+    <!-- 全局步骤指示器：当前步高亮，已完成的步骤打勾 -->
+    <nav id="step-nav" class="step-nav hidden" aria-label="录制步骤">
+      <ol>
+        <li class="step-item" data-step="code">
+          <span class="step-dot" aria-hidden="true">1</span>
+          <span class="step-label">输入口令</span>
+        </li>
+        <li class="step-item" data-step="name">
+          <span class="step-dot" aria-hidden="true">2</span>
+          <span class="step-label">填写姓名</span>
+        </li>
+        <li class="step-item" data-step="record">
+          <span class="step-dot" aria-hidden="true">3</span>
+          <span class="step-label">朗读录音</span>
+        </li>
+      </ol>
+    </nav>
+
     <!-- 环境类提示（非 secure context / 不支持录音等）统一显示在这里 -->
     <div id="env-alert" class="alert alert-error hidden" role="alert"></div>
     <div id="global-alert" class="alert alert-error hidden" role="alert"></div>
+    <!-- 屏幕阅读器专用播报区：录音关键节点、步骤切换等，避免计时数字刷屏 -->
+    <div id="sr-announcer" class="sr-only" role="status" aria-live="polite"></div>
 
     <!-- 第一步：员工端口令 -->
-    <section id="step-code" class="card">
-      <h2><span class="step-index">1</span> 输入员工口令</h2>
+    <section id="step-code" class="card" aria-labelledby="code-heading">
+      <h2 id="code-heading" tabindex="-1"><span class="step-index" aria-hidden="true">1</span> 输入员工口令</h2>
       <form id="code-form" class="form-row" autocomplete="off">
         <label for="code-input" class="sr-only">员工口令</label>
         <input id="code-input" type="password" placeholder="请输入员工口令" autocomplete="off">
         <button type="submit" id="code-submit" class="primary">进入</button>
       </form>
-      <p id="code-error" class="field-error hidden"></p>
+      <p id="code-error" class="field-error hidden" role="alert"></p>
     </section>
 
     <!-- 第二步：姓名 -->
-    <section id="step-name" class="card hidden">
-      <h2><span class="step-index">2</span> 填写姓名</h2>
+    <section id="step-name" class="card hidden" aria-labelledby="name-heading">
+      <h2 id="name-heading" tabindex="-1"><span class="step-index" aria-hidden="true">2</span> 填写姓名</h2>
       <form id="name-form" class="form-row" autocomplete="off">
         <label for="name-input" class="sr-only">姓名</label>
         <input id="name-input" type="text" placeholder="请输入你的姓名（用于区分提交记录）" autocomplete="off">
         <button type="submit" id="name-submit" class="primary">开始录音</button>
       </form>
       <p class="hint">姓名不需要审核，但请填写真实姓名；同一个姓名再次提交会覆盖上一次的录音。</p>
-      <p id="name-error" class="field-error hidden"></p>
+      <p id="name-error" class="field-error hidden" role="alert"></p>
     </section>
 
     <!-- 第三步：录音 -->
-    <section id="step-record" class="hidden">
+    <section id="step-record" class="hidden" aria-labelledby="record-heading">
       <div class="record-header">
-        <h2><span class="step-index">3</span> 朗读并录音</h2>
+        <div class="record-header-top">
+          <h2 id="record-heading" tabindex="-1"><span class="step-index" aria-hidden="true">3</span> 朗读并录音</h2>
+          <button type="button" id="edit-name-button" class="link-button">修改姓名</button>
+        </div>
         <p class="hint">
-          录音时请保持环境安静、语速自然。浏览器会对录音做音频后处理，
-          本工具已按项目要求<b>全部关闭</b>（回声消除 / 噪声抑制 / 自动增益），
-          以保证样本音色不被改变。
+          录音时请保持环境安静、语速自然，尽量一次读完。两段都录好后一起提交。
+          点错或读漏了，可以随时重录这一段。
         </p>
       </div>
 
       <div id="segments" class="segments"></div>
 
       <div class="card submit-card">
-        <button id="submit-button" class="primary big" disabled>提交录音</button>
+        <div class="submit-actions">
+          <button id="submit-button" class="primary big" disabled>提交录音</button>
+          <button id="cancel-upload-button" type="button" class="hidden">取消上传</button>
+        </div>
         <p id="submit-hint" class="hint">两段都录好后才能提交。</p>
+        <p id="submit-notice" class="notice hidden" role="status"></p>
         <div id="submit-progress" class="progress hidden">
-          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+          <div class="progress-bar" role="progressbar" aria-label="上传进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-bar">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
           <p id="progress-text" class="hint">正在上传……</p>
         </div>
-        <p id="submit-error" class="field-error hidden"></p>
+        <p id="submit-error" class="field-error hidden" role="alert"></p>
       </div>
     </section>
 
     <!-- 完成 -->
-    <section id="step-done" class="card hidden">
-      <h2>提交成功</h2>
+    <section id="step-done" class="card done-card hidden" aria-labelledby="done-heading">
+      <div class="done-icon" aria-hidden="true">✓</div>
+      <h2 id="done-heading" tabindex="-1">提交成功</h2>
       <p id="done-message" class="done-message"></p>
+      <dl id="done-summary" class="summary-grid"></dl>
       <button id="again-button" class="primary">重新录制并再次提交</button>
     </section>
   </main>

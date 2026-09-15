@@ -22,3 +22,5 @@
 | [005](./decisions/005-resubmit-policy.md) | 重复提交按姓名覆盖 |
 | [006](./decisions/006-docker-and-ci.md) | Docker 部署与 CI/CD 方向，及根目录结构冲突 |
 | [007](./decisions/007-upload-abort-and-timeout.md) | 上传中断与超时的资源回收（第一轮返工产物） |
+| [008](./decisions/008-ui-ux-polish.md) | UI/UX 与流程优化的方向与取舍（spec-002） |
+| [009](./decisions/009-recording-start-guard.md) | 录音启动的并发守卫（spec-002 返工产物） |
