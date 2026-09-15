@@ -33,3 +33,4 @@ specs/
 |---|---|---|
 | spec-001 | MVP 录音收集 | PASS（返工后复验通过；第二轮为协调 Agent 自验，非独立验收，见 `acceptance.md`） |
 | spec-002 | 界面与流程优化 | PASS（第二轮独立复验通过；第一轮 FAIL 的 E7 竞态已修复，见 `acceptance.md`） |
+| spec-003 | 界面重设计（视觉与排版） | PASS（第二轮为协调 Agent 自验，非独立；见 `spec-003-visual-redesign/acceptance.md`） |

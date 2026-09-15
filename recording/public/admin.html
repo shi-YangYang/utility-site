@@ -3,26 +3,84 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>语音样本录制 · 管理端</title>
+  <title>语音样本录制</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="topbar">
-    <h1>语音样本录制 · 管理端</h1>
-    <p class="subtitle">查看所有已提交的录音，可搜索、试听、下载。</p>
+  <!-- 内联图标集：零请求复用，颜色继承 currentColor -->
+  <svg class="svg-defs" aria-hidden="true" focusable="false">
+    <symbol id="i-mic" viewBox="0 0 24 24">
+      <rect x="9" y="3" width="6" height="11" rx="3"></rect>
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0"></path>
+      <path d="M12 17.5V21"></path>
+      <path d="M8.5 21h7"></path>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="6"></circle>
+      <path d="M15.5 15.5L20 20"></path>
+    </symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24">
+      <path d="M20 12a8 8 0 1 1-2.4-5.7"></path>
+      <path d="M20 4v4h-4"></path>
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24">
+      <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+      <path d="M5 15V6a2 2 0 0 1 2-2h8"></path>
+    </symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24">
+      <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"></path>
+      <path d="M10 12H3"></path>
+      <path d="M6 9l-3 3 3 3"></path>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24">
+      <path d="M8 5.5l11 6.5-11 6.5z" fill="currentColor" stroke="none"></path>
+    </symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24">
+      <rect x="7" y="5.5" width="3.5" height="13" rx="1" fill="currentColor" stroke="none"></rect>
+      <rect x="13.5" y="5.5" width="3.5" height="13" rx="1" fill="currentColor" stroke="none"></rect>
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24">
+      <path d="M12 4v11"></path>
+      <path d="M8 11.5l4 4 4-4"></path>
+      <path d="M5 20h14"></path>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+      <path d="M5 12.5l4.5 4.5L19 7.5"></path>
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24">
+      <path d="M12 4.5L21 19.5H3L12 4.5z"></path>
+      <path d="M12 10v4.5"></path>
+      <path d="M12 17.2v.3"></path>
+    </symbol>
+  </svg>
+
+  <header class="app-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg class="icon"><use href="#i-mic"></use></svg>
+        </span>
+        <div class="brand-text">
+          <h1>语音样本录制</h1>
+          <p class="brand-sub">管理端 · 查看、试听与下载所有已提交的录音</p>
+        </div>
+      </div>
+      <span class="role-badge role-badge-admin">管理后台</span>
+    </div>
   </header>
 
-  <main class="container">
+  <main class="container page">
     <div id="global-alert" class="alert alert-error hidden" role="alert"></div>
     <div id="global-notice" class="alert alert-info hidden" role="status"></div>
 
     <!-- 登录 -->
-    <section id="login-panel" class="card" aria-labelledby="login-heading">
+    <section id="login-panel" class="panel panel-narrow" aria-labelledby="login-heading">
       <h2 id="login-heading" tabindex="-1">管理端登录</h2>
+      <p class="hint">请输入管理员口令。会话有效期 12 小时，期间刷新页面不需要重新登录。</p>
       <form id="login-form" class="form-row" autocomplete="off">
         <label for="code-input" class="sr-only">管理端口令</label>
         <input id="code-input" type="password" placeholder="请输入管理端口令" autocomplete="off">
-        <button type="submit" id="login-submit" class="primary">登录</button>
+        <button type="submit" id="login-submit" class="btn btn-primary">登录</button>
       </form>
       <p id="login-error" class="field-error hidden" role="alert"></p>
     </section>
@@ -31,45 +89,69 @@
     <section id="list-panel" class="hidden" aria-labelledby="list-heading">
       <h2 id="list-heading" class="sr-only" tabindex="-1">提交记录列表</h2>
 
-      <div class="list-toolbar card">
-        <div class="list-summary">
-          <strong id="count-text" role="status">共 0 条提交记录</strong>
-          <span id="updated-text" class="hint"></span>
+      <div class="toolbar">
+        <div class="toolbar-title">
+          <h2 aria-hidden="true">提交记录</h2>
+          <p class="toolbar-meta">
+            <span id="count-text" role="status">共 0 条提交记录</span>
+            <span class="sep" aria-hidden="true">·</span>
+            <span id="updated-text" class="hint"></span>
+          </p>
         </div>
-        <div class="list-actions">
-          <label class="control-field">
-            <span class="sr-only">按姓名搜索</span>
-            <input id="search-input" type="search" placeholder="搜索姓名…" autocomplete="off">
-          </label>
-          <label class="control-field">
-            <span class="sr-only">排序方式</span>
-            <select id="sort-select">
-              <option value="updated-desc">最近更新优先</option>
-              <option value="first-desc">首次提交优先</option>
-              <option value="name-asc">按姓名排序</option>
-            </select>
-          </label>
-          <label class="switch-field">
-            <input id="auto-refresh" type="checkbox" checked>
-            <span>自动刷新</span>
-          </label>
-          <button type="button" id="copy-url-button">复制员工入口</button>
-          <button type="button" id="refresh-button">刷新</button>
-          <button type="button" id="logout-button">退出登录</button>
+
+        <div class="toolbar-groups">
+          <div class="control-group">
+            <label class="search-field">
+              <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+              <span class="sr-only">按姓名搜索</span>
+              <input id="search-input" type="search" placeholder="搜索姓名" autocomplete="off">
+            </label>
+            <label class="select-field">
+              <span class="sr-only">排序方式</span>
+              <select id="sort-select">
+                <option value="updated-desc">最近更新优先</option>
+                <option value="first-desc">首次提交优先</option>
+                <option value="name-asc">按姓名排序</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="control-group">
+            <label class="switch">
+              <input id="auto-refresh" type="checkbox" checked>
+              <span class="switch-label">自动刷新</span>
+            </label>
+          </div>
+
+          <div class="control-group control-group-actions">
+            <button type="button" id="copy-url-button" class="btn btn-icon" title="复制员工入口地址">
+              <svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg>
+              <span class="sr-only">复制员工入口地址</span>
+            </button>
+            <button type="button" id="refresh-button" class="btn">
+              <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+              刷新
+            </button>
+            <button type="button" id="logout-button" class="btn btn-ghost">
+              <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+              退出
+            </button>
+          </div>
         </div>
       </div>
 
-      <div id="empty-state" class="card empty-state hidden">
-        <p>还没有任何员工提交录音。</p>
+      <div id="empty-state" class="panel empty-state hidden">
+        <p class="empty-title">还没有任何员工提交录音</p>
         <p class="hint">把员工端地址发给同事即可开始收集：</p>
         <p class="empty-url">
           <code id="employee-url"></code>
-          <button type="button" id="copy-url-empty" class="link-button">复制</button>
+          <button type="button" id="copy-url-empty" class="btn btn-sm">复制</button>
         </p>
       </div>
 
-      <div id="empty-filter" class="card empty-state hidden">
+      <div id="empty-filter" class="panel empty-state hidden">
         <p id="empty-filter-text">没有匹配的记录。</p>
+        <button type="button" id="clear-search-button" class="btn btn-sm">清空搜索</button>
       </div>
 
       <div id="table-wrapper" class="table-wrapper hidden">
@@ -79,8 +161,8 @@
               <th scope="col">姓名</th>
               <th scope="col">中文录音</th>
               <th scope="col">英文录音</th>
-              <th scope="col">首次提交</th>
-              <th scope="col">最近更新</th>
+              <th scope="col" class="col-time">首次提交</th>
+              <th scope="col" class="col-time">最近更新</th>
             </tr>
           </thead>
           <tbody id="table-body"></tbody>
@@ -89,8 +171,10 @@
     </section>
   </main>
 
-  <footer class="footer">
-    <p>仅供公司内部语音样本采集使用 · 录音文件保存在服务端数据目录中</p>
+  <footer class="app-footer">
+    <div class="container">
+      <p>仅供公司内部语音样本采集使用 · 录音文件保存在服务端数据目录中</p>
+    </div>
   </footer>
 
   <script src="/admin.js"></script>
