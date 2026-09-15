@@ -579,9 +579,9 @@
     const url = `${window.location.origin}/`;
     const ok = await copyText(url);
     if (ok) {
-      showNotice(`已复制员工入口：${url}`);
+      showNotice(`已复制录音入口：${url}`);
     } else {
-      showAlert(`复制失败，请手动复制员工入口：${url}`);
+      showAlert(`复制失败，请手动复制录音入口：${url}`);
     }
   }
 
@@ -591,7 +591,7 @@
     event.preventDefault();
     const code = dom.codeInput.value;
     if (!code) {
-      showLoginError('请输入管理端口令。');
+      showLoginError('请输入管理口令。');
       return;
     }
 

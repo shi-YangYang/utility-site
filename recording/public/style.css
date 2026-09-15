@@ -676,8 +676,6 @@ select:focus-visible {
   flex: 1 1 auto;
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
-  max-height: 320px;
-  overflow: auto;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r);
