@@ -1,0 +1,31 @@
+# 构建镜像时不需要的东西，一律不进构建上下文。
+# 注意：Dockerfile 里是逐个 COPY server/ public/ content/ 的，
+# 所以这里主要作用是缩小上下文体积、避免把运行时数据与密钥带进镜像。
+
+node_modules
+data
+.git
+.gitignore
+
+# compose 文件与 Dockerfile 本身不需要进构建上下文（Dockerfile 由 build 直接读取）
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# 密钥与环境文件（.env.example 是样例，镜像里也用不到）
+.env
+.env.*
+
+# 文档与 Agent 结构：运行镜像不需要
+constitution
+specs
+.ai
+docs
+AGENTS.md
+README.md
+
+# 编辑器 / 系统垃圾
+.DS_Store
+Thumbs.db
+*.swp
+*.log

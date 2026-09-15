@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>语音样本录制 · 员工端</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>语音样本录制</h1>
+    <p class="subtitle">
+      请分别朗读下面两段文字并录音，每段大约 <strong id="target-seconds">60</strong> 秒。
+      录完后可以试听、重录，两段都满意再一起提交。
+    </p>
+  </header>
+
+  <main class="container">
+    <!-- 环境类提示（非 secure context / 不支持录音等）统一显示在这里 -->
+    <div id="env-alert" class="alert alert-error hidden" role="alert"></div>
+    <div id="global-alert" class="alert alert-error hidden" role="alert"></div>
+
+    <!-- 第一步：员工端口令 -->
+    <section id="step-code" class="card">
+      <h2><span class="step-index">1</span> 输入员工口令</h2>
+      <form id="code-form" class="form-row" autocomplete="off">
+        <label for="code-input" class="sr-only">员工口令</label>
+        <input id="code-input" type="password" placeholder="请输入员工口令" autocomplete="off">
+        <button type="submit" id="code-submit" class="primary">进入</button>
+      </form>
+      <p id="code-error" class="field-error hidden"></p>
+    </section>
+
+    <!-- 第二步：姓名 -->
+    <section id="step-name" class="card hidden">
+      <h2><span class="step-index">2</span> 填写姓名</h2>
+      <form id="name-form" class="form-row" autocomplete="off">
+        <label for="name-input" class="sr-only">姓名</label>
+        <input id="name-input" type="text" placeholder="请输入你的姓名（用于区分提交记录）" autocomplete="off">
+        <button type="submit" id="name-submit" class="primary">开始录音</button>
+      </form>
+      <p class="hint">姓名不需要审核，但请填写真实姓名；同一个姓名再次提交会覆盖上一次的录音。</p>
+      <p id="name-error" class="field-error hidden"></p>
+    </section>
+
+    <!-- 第三步：录音 -->
+    <section id="step-record" class="hidden">
+      <div class="record-header">
+        <h2><span class="step-index">3</span> 朗读并录音</h2>
+        <p class="hint">
+          录音时请保持环境安静、语速自然。浏览器会对录音做音频后处理，
+          本工具已按项目要求<b>全部关闭</b>（回声消除 / 噪声抑制 / 自动增益），
+          以保证样本音色不被改变。
+        </p>
+      </div>
+
+      <div id="segments" class="segments"></div>
+
+      <div class="card submit-card">
+        <button id="submit-button" class="primary big" disabled>提交录音</button>
+        <p id="submit-hint" class="hint">两段都录好后才能提交。</p>
+        <div id="submit-progress" class="progress hidden">
+          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+          <p id="progress-text" class="hint">正在上传……</p>
+        </div>
+        <p id="submit-error" class="field-error hidden"></p>
+      </div>
+    </section>
+
+    <!-- 完成 -->
+    <section id="step-done" class="card hidden">
+      <h2>提交成功</h2>
+      <p id="done-message" class="done-message"></p>
+      <button id="again-button" class="primary">重新录制并再次提交</button>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>仅供公司内部语音样本采集使用 · 本工具只负责收集，不做任何分析</p>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+# recording —— Docker Compose 配置
+#
+# 用法：
+#   docker compose up -d --build    构建并后台启动
+#   docker compose logs -f          看日志
+#   docker compose down             停止（数据保留在 ./data）
+#
+# 镜像内已装好 ffmpeg，所以走这条路**不需要**在 Mac 上 brew install ffmpeg。
+#
+# 配置来源：项目根目录的 .env（没有就用下面的默认值）。
+# 但注意 DATA_DIR 例外 —— 容器里固定是 /app/data，宿主上的 ./data 挂进去。
+# .env 里的 DATA_DIR 只对本机 `npm start` 生效，容器模式忽略它。
+
+services:
+  recording:
+    build:
+      context: .
+    image: recording:latest
+    container_name: recording
+    restart: unless-stopped
+
+    ports:
+      # 左边是宿主端口（浏览器访问用），右边是容器内端口。
+      # 容器内永远是 3000；想换宿主端口就设 HOST_PORT，别动 .env 里的 PORT
+      # （PORT 是给本机 npm start 用的，两边混用会让人看不懂）。
+      - "${HOST_PORT:-3000}:3000"
+
+    environment:
+      # 容器内固定 3000，与上面的端口映射右侧保持一致
+      PORT: "3000"
+      # 必须覆盖掉 .env 里的相对路径，否则容器会往镜像层里写数据
+      DATA_DIR: /app/data
+
+      EMPLOYEE_CODE: "${EMPLOYEE_CODE:-123}"
+      ADMIN_CODE: "${ADMIN_CODE:-admin123}"
+      SAMPLE_RATE: "${SAMPLE_RATE:-16000}"
+      MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-50}"
+
+    volumes:
+      # 录音与索引必须落在宿主上，否则容器重建一次数据就没了。
+      # 首次启动前可以先 mkdir -p ./data 并把属主设成 1000:1000（见下面 user 的说明）。
+      - ./data:/app/data
+
+    # 用公开的 /api/config 做健康检查，不需要新加接口。
+    # 容器内 Node 自带 fetch（Node 18+）。
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/config').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    # 数据目录属主问题：
+    # 镜像里以非 root 的 node 用户（uid 1000）运行，/app/data 的属主也是它。
+    # 如果宿主上 ./data 的属主不是 1000，容器会以「数据目录不可写」启动失败。
+    # macOS 的 Docker Desktop 走文件共享、一般会自动做 uid 映射，通常不用管；
+    # 真遇到问题，先试：  sudo chown -R 1000:1000 ./data
+    # 还不行就用宿主身份跑（把下面这行取消注释）：
+    # user: "0:0"

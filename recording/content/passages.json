@@ -1,0 +1,20 @@
+{
+  "_comment": "朗读稿与录音时长配置。这是纯数据文件，改文本、改时长都在这里，不需要动任何代码。目标时长按正常朗读速度估算：中文约 3.9 字/秒，英文约 2.5 词/秒。",
+  "targetSeconds": 60,
+  "minSeconds": 10,
+  "maxSeconds": 180,
+  "segments": [
+    {
+      "key": "zh",
+      "label": "中文",
+      "lang": "zh-CN",
+      "text": "清晨的城市还没有完全醒来，街角的早点铺子已经亮起了灯。老板把刚出笼的包子一只只摆进竹屉，白气顺着屋檐慢慢散开，混着豆浆的甜香，飘到马路对面。上班的人从这里经过，有的停下脚步买上一份，有的只是匆匆看了一眼，又加快步子赶往地铁站。这个时候，整个城市像是被按下了启动键，一点点热闹起来。我常常想，一天当中最踏实的时刻，大概就是这样的早晨：天刚亮，事情还没开始，心里装着的都是简单而具体的打算。公交车靠站，报站的声音从喇叭里传出来，人们排着队上车，各自找一个位置坐下。窗外，树影一层层向后退去，阳光从楼与楼的缝隙里漏下来，落在车厢的地板上。"
+    },
+    {
+      "key": "en",
+      "label": "英文",
+      "lang": "en-US",
+      "text": "The morning train was already crowded when I stepped aboard, and I found a place near the window where I could watch the city slide past. A woman beside me was reading a thick novel, turning the pages slowly, and a pair of schoolchildren argued quietly about whose turn it was to hold the map. Outside, the river caught the early light and threw it back in bright, broken pieces. I thought about the day ahead: the meetings, the messages waiting, the small decisions that would fill the hours. For a moment it all seemed manageable, even pleasant. The train slowed, the doors opened with a soft hiss, and half the carriage rose at once, gathering bags and coats and stepping out into the cold, clear air. I stayed where I was, watching the platform empty, and listened to the wheels begin to turn again."
+    }
+  ]
+}
