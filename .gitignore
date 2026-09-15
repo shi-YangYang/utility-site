@@ -1,0 +1,23 @@
+# 工具站的忽略规则统一写在这里，子项目默认不建自己的 .gitignore。
+# 只有某条规则仅对单个子项目成立、写进这里会误伤其他子项目时，
+# 才在那个子项目内单独建一份并注明原因。详见 AGENTS.md 第 5.1 节。
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+build/
+*.log
+
+# 环境变量与密钥 —— 永远不要提交
+.env
+.env.*
+*.pem
