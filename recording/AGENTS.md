@@ -13,7 +13,7 @@
 workflow_tier: FULL
 
 判档理由：存在服务端（录音要上传）、存在数据持久化（录音落盘 + 员工索引），
-不满足根规范 6.1 中 LIGHT 档的前两条。详见 `.ai/decisions/001-workflow-tier.md`。
+不满足根规范 6.1 中 LIGHT 档的前两条。
 
 ## 项目模式
 

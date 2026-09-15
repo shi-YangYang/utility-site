@@ -234,4 +234,4 @@ Node.js + 原生 HTML/JS。后端一个轻量 HTTP 服务，前端两个静态�
 - 本目录的规则与继承关系：[`AGENTS.md`](./AGENTS.md)
 - 产品使命与方向：[`constitution/`](./constitution/)
 - 需求规格：[`specs/`](./specs/)
-- 关键决策留痕：[`.ai/decisions/`](./.ai/decisions/)
+- 关键决策：[`.ai/decisions/`](./.ai/decisions/)

@@ -90,7 +90,7 @@ emit `'close'`，导致 `await parserFinished` 永不 resolve、`cleanupUploads(
 ## 返工记录
 
 见同目录 `rework.md`。返工只改动了一个文件：`server/routes/employee.js`。
-改动要点与理由记录在 `.ai/decisions/007-upload-abort-and-timeout.md`。
+改动要点已回写进 `constitution/tech-stack.md` 的「上传生命周期」一节。
 
 返工还额外发现并修复了一条**同类**残留路径（第一轮未测到）：
 畸形表单（`Content-Length` 完整、multipart 被截断）虽然正常返回 400，
@@ -191,7 +191,7 @@ emit `'close'`，导致 `await parserFinished` 永不 resolve、`cleanupUploads(
    后续改动此处需重跑本文件的 Tests A–C。
 2. **两个超时时长是硬编码常量**（空闲 30s / 总计 60s），不是配置项。
    若将来把 `MAX_UPLOAD_MB` 调得很大、又在慢速链路上使用，会被 60 秒上限掐掉。
-   这是有意的技术债，记录在 `.ai/decisions/007`。
+   这是有意的技术债，见 `constitution/tech-stack.md` 的「上传生命周期」一节。
 3. **前端录制时长用 `Date.now()` 差值判定**，与 `MediaRecorder` 产物的实际时长可能不一致。
    真实设备丢帧时，可能出现「前端认为够长、服务端 ffprobe 判定过短」而提交被 400
    （有中文原因提示，可恢复，但算一次失败提交）。
