@@ -24,3 +24,6 @@ build/
 # 写成不带路径前缀的形式，对任意深度的子项目都生效。
 !.env.example
 *.pem
+
+# 部署：服务器上由 Caddyfile.example 复制出的真实配置（含服务器地址），不进仓库
+deploy/proxy/Caddyfile
