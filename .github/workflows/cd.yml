@@ -1,0 +1,101 @@
+# CD：合并到 main 后执行，按改动目录通过 SSH 部署到服务器。
+#
+# - 服务器凭据（SSH_HOST / SSH_USER / SSH_KEY）未配置时跳过并提示，不失败；
+# - 还需要仓库变量 DEPLOY_PATH（服务器上仓库的绝对路径）；
+# - 手动补部署：Actions 里手动运行本工作流，填 project（如 recording / proxy / all）。
+#
+# 约定见根 AGENTS.md 5.2 / 5.3；服务器准备与凭据配置见 deploy/README.md。
+# 本文件位于仓库根 .github/，是经用户批准的唯一根目录结构例外（AGENTS.md 21.2）。
+
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      project:
+        description: "要部署的目标（子项目名 / proxy / all）"
+        required: true
+        default: "recording"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码（diff 需要完整历史）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 确定部署目标
+        id: targets
+        run: |
+          set -eu
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            targets="${{ inputs.project }}"
+          else
+            before="${{ github.event.before }}"
+            if [ "$before" = "0000000000000000000000000000000000000000" ]; then
+              changed=""
+            else
+              changed=$(git diff --name-only "$before...HEAD" | awk -F/ 'NF > 1 { print $1 }' | sort -u)
+            fi
+            targets=""
+            for p in $changed; do
+              case "$p" in
+                deploy) targets="$targets all" ;;
+                .github) : ;; # 仅流水线自身变化，不影响运行中的服务
+                *) targets="$targets $p" ;;
+              esac
+            done
+          fi
+          targets=$(printf '%s\n' $targets | sort -u | tr '\n' ' ')
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+          echo "部署目标：${targets:-（无）}"
+
+      - name: 检查服务器凭据是否已配置
+        id: creds
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          if [ -z "${SSH_HOST:-}" ] || [ -z "${SSH_USER:-}" ] || [ -z "${SSH_KEY:-}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::未配置 SSH_HOST / SSH_USER / SSH_KEY，跳过部署；配置方法见 deploy/README.md"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: SSH 部署到服务器
+        if: steps.creds.outputs.ready == 'true' && steps.targets.outputs.targets != ''
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          TARGETS: ${{ steps.targets.outputs.targets }}
+        run: |
+          set -eu
+          if [ -z "${DEPLOY_PATH:-}" ]; then
+            echo "::error::未配置仓库变量 DEPLOY_PATH（服务器上仓库的绝对路径）"
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          for t in $TARGETS; do
+            echo "==> 部署 $t"
+            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+              "$SSH_USER@$SSH_HOST" \
+              "cd '$DEPLOY_PATH' && git pull --ff-only && ./deploy/scripts/deploy.sh $t"
+          done

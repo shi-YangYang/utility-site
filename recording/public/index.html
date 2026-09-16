@@ -3,33 +3,65 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>语音样本录制 · 员工端</title>
+  <title>语音样本录制</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="topbar">
-    <h1>语音样本录制</h1>
-    <p class="subtitle">
-      请分别朗读下面两段文字并录音，每段大约 <strong id="target-seconds">60</strong> 秒。
-      录完可以试听、重录，两段都满意再一起提交。
-    </p>
+  <!-- 内联图标集：零请求复用，颜色继承 currentColor -->
+  <svg class="svg-defs" aria-hidden="true" focusable="false">
+    <symbol id="i-mic" viewBox="0 0 24 24">
+      <rect x="9" y="3" width="6" height="11" rx="3"></rect>
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0"></path>
+      <path d="M12 17.5V21"></path>
+      <path d="M8.5 21h7"></path>
+    </symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24">
+      <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"></rect>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+      <path d="M5 12.5l4.5 4.5L19 7.5"></path>
+    </symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24">
+      <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"></path>
+      <path d="M13.5 6.5l3 3"></path>
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24">
+      <path d="M12 4.5L21 19.5H3L12 4.5z"></path>
+      <path d="M12 10v4.5"></path>
+      <path d="M12 17.2v.3"></path>
+    </symbol>
+  </svg>
+
+  <header class="app-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg class="icon"><use href="#i-mic"></use></svg>
+        </span>
+        <div class="brand-text">
+          <h1>语音样本录制</h1>
+          <p class="brand-sub">朗读并提交你的中英文录音</p>
+        </div>
+      </div>
+      <span class="role-badge">录音入口</span>
+    </div>
   </header>
 
-  <main class="container">
-    <!-- 全局步骤指示器：当前步高亮，已完成的步骤打勾 -->
-    <nav id="step-nav" class="step-nav hidden" aria-label="录制步骤">
+  <main class="container page">
+    <!-- 步骤指示器：页面上唯一的步骤编号来源 -->
+    <nav id="step-nav" class="stepper hidden" aria-label="录制步骤">
       <ol>
-        <li class="step-item" data-step="code">
-          <span class="step-dot" aria-hidden="true">1</span>
-          <span class="step-label">输入口令</span>
+        <li class="step" data-step="code">
+          <span class="dot"><span class="num">1</span><svg class="icon tick" aria-hidden="true"><use href="#i-check"></use></svg></span>
+          <span class="label">输入口令</span>
         </li>
-        <li class="step-item" data-step="name">
-          <span class="step-dot" aria-hidden="true">2</span>
-          <span class="step-label">填写姓名</span>
+        <li class="step" data-step="name">
+          <span class="dot"><span class="num">2</span><svg class="icon tick" aria-hidden="true"><use href="#i-check"></use></svg></span>
+          <span class="label">填写姓名</span>
         </li>
-        <li class="step-item" data-step="record">
-          <span class="step-dot" aria-hidden="true">3</span>
-          <span class="step-label">朗读录音</span>
+        <li class="step" data-step="record">
+          <span class="dot"><span class="num">3</span><svg class="icon tick" aria-hidden="true"><use href="#i-check"></use></svg></span>
+          <span class="label">朗读录音</span>
         </li>
       </ol>
     </nav>
@@ -40,73 +72,84 @@
     <!-- 屏幕阅读器专用播报区：录音关键节点、步骤切换等，避免计时数字刷屏 -->
     <div id="sr-announcer" class="sr-only" role="status" aria-live="polite"></div>
 
-    <!-- 第一步：员工端口令 -->
-    <section id="step-code" class="card" aria-labelledby="code-heading">
-      <h2 id="code-heading" tabindex="-1"><span class="step-index" aria-hidden="true">1</span> 输入员工口令</h2>
+    <!-- 第一步：员工口令 -->
+    <section id="step-code" class="panel panel-narrow" aria-labelledby="code-heading">
+      <h2 id="code-heading" tabindex="-1">输入员工口令</h2>
+      <p class="hint">口令由管理员提供，用于确认你是本公司员工。</p>
       <form id="code-form" class="form-row" autocomplete="off">
         <label for="code-input" class="sr-only">员工口令</label>
         <input id="code-input" type="password" placeholder="请输入员工口令" autocomplete="off">
-        <button type="submit" id="code-submit" class="primary">进入</button>
+        <button type="submit" id="code-submit" class="btn btn-primary">进入</button>
       </form>
       <p id="code-error" class="field-error hidden" role="alert"></p>
     </section>
 
     <!-- 第二步：姓名 -->
-    <section id="step-name" class="card hidden" aria-labelledby="name-heading">
-      <h2 id="name-heading" tabindex="-1"><span class="step-index" aria-hidden="true">2</span> 填写姓名</h2>
+    <section id="step-name" class="panel panel-narrow hidden" aria-labelledby="name-heading">
+      <h2 id="name-heading" tabindex="-1">填写姓名</h2>
+      <p class="hint">请填写真实姓名；同一个姓名再次提交会覆盖上一次的录音。</p>
       <form id="name-form" class="form-row" autocomplete="off">
         <label for="name-input" class="sr-only">姓名</label>
-        <input id="name-input" type="text" placeholder="请输入你的姓名（用于区分提交记录）" autocomplete="off">
-        <button type="submit" id="name-submit" class="primary">开始录音</button>
+        <input id="name-input" type="text" placeholder="请输入你的姓名" autocomplete="off">
+        <button type="submit" id="name-submit" class="btn btn-primary">开始录音</button>
       </form>
-      <p class="hint">姓名不需要审核，但请填写真实姓名；同一个姓名再次提交会覆盖上一次的录音。</p>
       <p id="name-error" class="field-error hidden" role="alert"></p>
     </section>
 
     <!-- 第三步：录音 -->
     <section id="step-record" class="hidden" aria-labelledby="record-heading">
-      <div class="record-header">
-        <div class="record-header-top">
-          <h2 id="record-heading" tabindex="-1"><span class="step-index" aria-hidden="true">3</span> 朗读并录音</h2>
-          <button type="button" id="edit-name-button" class="link-button">修改姓名</button>
+      <div class="section-head">
+        <div>
+          <h2 id="record-heading" tabindex="-1">朗读并录音</h2>
+          <p class="hint" id="record-target-hint">每段目标约 60 秒，尽量一次读完；读漏了可以单独重录这一段。</p>
         </div>
-        <p class="hint">
-          录音时请保持环境安静、语速自然，尽量一次读完。两段都录好后一起提交。
-          点错或读漏了，可以随时重录这一段。
-        </p>
+        <button type="button" id="edit-name-button" class="btn btn-ghost">
+          <svg class="icon" aria-hidden="true"><use href="#i-edit"></use></svg>
+          修改姓名
+        </button>
       </div>
 
       <div id="segments" class="segments"></div>
 
-      <div class="card submit-card">
-        <div class="submit-actions">
-          <button id="submit-button" class="primary big" disabled>提交录音</button>
-          <button id="cancel-upload-button" type="button" class="hidden">取消上传</button>
+      <section class="panel submit-panel" aria-labelledby="submit-heading">
+        <div class="submit-head">
+          <div>
+            <h3 id="submit-heading">提交</h3>
+            <p id="submit-hint" class="hint">两段都录好后才能提交。</p>
+          </div>
+          <div class="submit-summary" id="submit-summary"></div>
         </div>
-        <p id="submit-hint" class="hint">两段都录好后才能提交。</p>
+        <div class="submit-actions">
+          <button id="submit-button" class="btn btn-primary btn-lg" disabled>提交录音</button>
+          <button id="cancel-upload-button" type="button" class="btn hidden">取消上传</button>
+        </div>
         <p id="submit-notice" class="notice hidden" role="status"></p>
         <div id="submit-progress" class="progress hidden">
           <div class="progress-bar" role="progressbar" aria-label="上传进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-bar">
             <div id="progress-fill" class="progress-fill"></div>
           </div>
-          <p id="progress-text" class="hint">正在上传……</p>
+          <p id="progress-text" class="progress-text">正在上传……</p>
         </div>
         <p id="submit-error" class="field-error hidden" role="alert"></p>
-      </div>
+      </section>
     </section>
 
     <!-- 完成 -->
-    <section id="step-done" class="card done-card hidden" aria-labelledby="done-heading">
-      <div class="done-icon" aria-hidden="true">✓</div>
+    <section id="step-done" class="panel panel-narrow done-panel hidden" aria-labelledby="done-heading">
+      <div class="done-check" aria-hidden="true">
+        <svg class="icon"><use href="#i-check"></use></svg>
+      </div>
       <h2 id="done-heading" tabindex="-1">提交成功</h2>
       <p id="done-message" class="done-message"></p>
-      <dl id="done-summary" class="summary-grid"></dl>
-      <button id="again-button" class="primary">重新录制并再次提交</button>
+      <dl id="done-summary" class="summary-list"></dl>
+      <button id="again-button" class="btn">重新录制并再次提交</button>
     </section>
   </main>
 
-  <footer class="footer">
-    <p>仅供公司内部语音样本采集使用 · 本工具只负责收集，不做任何分析</p>
+  <footer class="app-footer">
+    <div class="container">
+      <p>公司内部语音样本采集使用</p>
+    </div>
   </footer>
 
   <script src="/app.js"></script>

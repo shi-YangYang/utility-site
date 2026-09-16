@@ -37,11 +37,29 @@
     copyUrlEmpty: el('copy-url-empty'),
     emptyFilter: el('empty-filter'),
     emptyFilterText: el('empty-filter-text'),
+    clearSearchButton: el('clear-search-button'),
     tableWrapper: el('table-wrapper'),
     tableBody: el('table-body'),
   };
 
   const SEGMENT_ORDER = ['zh', 'en'];
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  /** 引用页面内联图标集里的一枚图标。 */
+  function icon(name) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'icon');
+    svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS(SVG_NS, 'use');
+    use.setAttribute('href', `#${name}`);
+    svg.appendChild(use);
+    return svg;
+  }
+
+  function textNode(text) {
+    return document.createTextNode(text);
+  }
   /** 自动刷新间隔。单管理员使用，30 秒足够，且可随时关闭。 */
   const REFRESH_INTERVAL_MS = 30 * 1000;
   /** 相对时间的自动刷新间隔。 */
@@ -151,10 +169,20 @@
     return formatTime(new Date(Date.now() - diff).toISOString());
   }
 
-  function formatDuration(seconds) {
+  /**
+   * 录音时长统一格式化为 m:ss.s（如 1:02.4）；compact 时省略十分位。
+   * 无效或非正数返回「—」。
+   */
+  function formatClock(seconds, { compact = false } = {}) {
     const value = Number(seconds);
     if (!Number.isFinite(value) || value <= 0) return '—';
-    return `${value.toFixed(1)} 秒`;
+    const totalTenths = Math.round(value * 10);
+    const tenths = totalTenths % 10;
+    const totalSeconds = Math.floor(totalTenths / 10);
+    const minutes = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    const head = `${minutes}:${String(secs).padStart(2, '0')}`;
+    return compact ? head : `${head}.${tenths}`;
   }
 
   function formatBytes(bytes) {
@@ -164,10 +192,13 @@
     return `${(value / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  /** 一段录音的单元格：时长 + 试听播放器 + 下载链接。 */
-  function buildSegmentCell(segment, label) {
+  /**
+   * 一段录音的单元格：时长信息 + 精简播放器 + 下载图标。
+   * 播放器用原生 button / input[type=range] 组装（不引依赖），键盘可达。
+   */
+  function buildSegmentCell(segment, label, employeeName) {
     const cell = document.createElement('td');
-    cell.className = 'segment-cell';
+    cell.className = 'col-audio';
 
     if (!segment) {
       cell.appendChild(document.createTextNode('—'));
@@ -175,39 +206,141 @@
     }
 
     const meta = document.createElement('div');
-    meta.className = 'segment-meta';
-    meta.appendChild(document.createTextNode(`${label}：${formatDuration(segment.durationSec)}（${formatBytes(segment.bytes)}）`));
+    meta.className = 'audio-meta';
+    meta.appendChild(textNode(`${formatClock(segment.durationSec)} · ${formatBytes(segment.bytes)}`));
 
     if (state.minSeconds > 0 && Number(segment.durationSec) > 0 && Number(segment.durationSec) < state.minSeconds) {
       const badge = document.createElement('span');
-      badge.className = 'badge badge-warn';
+      badge.className = 'chip is-warn';
       badge.textContent = '偏短';
       badge.title = `短于要求的 ${state.minSeconds} 秒`;
       meta.appendChild(badge);
     }
     cell.appendChild(meta);
 
-    if (segment.audioUrl) {
-      const player = document.createElement('audio');
-      player.controls = true;
-      player.preload = 'none';
-      player.src = segment.audioUrl;
-      cell.appendChild(player);
-    }
+    const row = document.createElement('div');
+    row.className = 'audio-row';
 
-    if (segment.downloadUrl) {
-      const link = document.createElement('a');
-      link.href = segment.downloadUrl;
-      link.textContent = '下载 WAV';
-      link.className = 'download-link';
-      cell.appendChild(link);
-    }
+    const playButton = document.createElement('button');
+    playButton.type = 'button';
+    playButton.className = 'play-btn';
+    const setPlayLabel = (playing) => {
+      playButton.setAttribute('aria-label', `${playing ? '暂停' : '播放'} ${employeeName} 的${label}录音`);
+      playButton.title = playing ? '暂停' : '播放';
+    };
+    setPlayLabel(false);
+    const playIcon = icon('i-play');
+    playIcon.classList.add('icon-play');
+    const pauseIcon = icon('i-pause');
+    pauseIcon.classList.add('icon-pause');
+    playButton.append(playIcon, pauseIcon);
+
+    const track = document.createElement('div');
+    track.className = 'track';
+
+    const seek = document.createElement('input');
+    seek.type = 'range';
+    seek.className = 'seek';
+    seek.min = '0';
+    seek.max = '1000';
+    seek.step = '1';
+    seek.value = '0';
+    seek.setAttribute('aria-label', `${employeeName} 的${label}录音播放进度`);
+
+    const times = document.createElement('span');
+    times.className = 'times';
+    const elapsedText = document.createElement('span');
+    elapsedText.className = 'elapsed';
+    elapsedText.textContent = '0:00';
+    const durationText = document.createElement('span');
+    durationText.className = 'duration';
+    durationText.textContent = formatClock(segment.durationSec).replace(/\.\d$/, '');
+    times.append(elapsedText, textNode(' / '), durationText);
+
+    track.append(seek, times);
+
+    const download = document.createElement('a');
+    download.className = 'icon-btn';
+    download.href = segment.downloadUrl;
+    download.title = '下载 WAV';
+    download.setAttribute('aria-label', `下载 ${employeeName} 的${label}录音`);
+    download.appendChild(icon('i-download'));
+
+    row.append(playButton, track, download);
+    cell.appendChild(row);
+
+    const audio = document.createElement('audio');
+    audio.preload = 'none';
+    audio.src = segment.audioUrl;
+    audio.className = 'audio-engine';
+    cell.appendChild(audio);
+
+    const currentDuration = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) return audio.duration;
+      const fallback = Number(segment.durationSec);
+      return Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
+    };
+
+    playButton.addEventListener('click', () => {
+      if (audio.paused) audio.play().catch(() => {});
+      else audio.pause();
+    });
+
+    seek.addEventListener('input', () => {
+      seek.dataset.seeking = '1';
+      const duration = currentDuration();
+      if (duration > 0) {
+        const target = (Number(seek.value) / 1000) * duration;
+        try {
+          audio.currentTime = target;
+        } catch {
+          // 元数据还没就绪时忽略，等 loadedmetadata 后重试
+        }
+        elapsedText.textContent = formatClock(target, { compact: true });
+      }
+    });
+
+    seek.addEventListener('change', () => {
+      delete seek.dataset.seeking;
+    });
+
+    audio.addEventListener('loadedmetadata', () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        durationText.textContent = formatClock(audio.duration, { compact: true });
+      }
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      const duration = currentDuration();
+      if (!seek.dataset.seeking && duration > 0) {
+        seek.value = String(Math.round((audio.currentTime / duration) * 1000));
+      }
+      elapsedText.textContent = formatClock(audio.currentTime, { compact: true });
+    });
+
+    audio.addEventListener('play', () => {
+      playButton.classList.add('is-playing');
+      setPlayLabel(true);
+    });
+
+    audio.addEventListener('pause', () => {
+      playButton.classList.remove('is-playing');
+      setPlayLabel(false);
+    });
+
+    audio.addEventListener('ended', () => {
+      playButton.classList.remove('is-playing');
+      setPlayLabel(false);
+      seek.value = '0';
+      elapsedText.textContent = '0:00';
+    });
 
     return cell;
   }
 
   function buildTimeCell(iso) {
     const cell = document.createElement('td');
+    cell.className = 'col-time';
     const time = document.createElement('time');
     time.className = 'time';
     time.dateTime = iso || '';
@@ -224,11 +357,16 @@
     const nameCell = document.createElement('td');
     nameCell.className = 'name-cell';
     nameCell.textContent = employee.name || '(未填写姓名)';
+    nameCell.title = employee.name || '';
     row.appendChild(nameCell);
 
     for (const key of SEGMENT_ORDER) {
       row.appendChild(
-        buildSegmentCell(employee.segments ? employee.segments[key] : null, key === 'zh' ? '中文' : '英文')
+        buildSegmentCell(
+          employee.segments ? employee.segments[key] : null,
+          key === 'zh' ? '中文' : '英文',
+          employee.name || '(未填写姓名)'
+        )
       );
     }
 
@@ -441,9 +579,9 @@
     const url = `${window.location.origin}/`;
     const ok = await copyText(url);
     if (ok) {
-      showNotice(`已复制员工入口：${url}`);
+      showNotice(`已复制录音入口：${url}`);
     } else {
-      showAlert(`复制失败，请手动复制员工入口：${url}`);
+      showAlert(`复制失败，请手动复制录音入口：${url}`);
     }
   }
 
@@ -453,7 +591,7 @@
     event.preventDefault();
     const code = dom.codeInput.value;
     if (!code) {
-      showLoginError('请输入管理端口令。');
+      showLoginError('请输入管理口令。');
       return;
     }
 
@@ -499,6 +637,12 @@
 
   dom.searchInput.addEventListener('input', () => {
     state.searchTerm = dom.searchInput.value.trim();
+    renderList();
+  });
+
+  dom.clearSearchButton.addEventListener('click', () => {
+    dom.searchInput.value = '';
+    state.searchTerm = '';
     renderList();
   });
 

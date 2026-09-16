@@ -54,9 +54,9 @@
     envAlert: el('env-alert'),
     globalAlert: el('global-alert'),
     announcer: el('sr-announcer'),
-    targetSeconds: el('target-seconds'),
+    recordTargetHint: el('record-target-hint'),
     stepNav: el('step-nav'),
-    stepItems: Array.from(document.querySelectorAll('#step-nav .step-item')),
+    stepItems: Array.from(document.querySelectorAll('#step-nav .step')),
 
     stepCode: el('step-code'),
     codeHeading: el('code-heading'),
@@ -81,6 +81,7 @@
     submitHint: el('submit-hint'),
     submitNotice: el('submit-notice'),
     submitError: el('submit-error'),
+    submitSummary: el('submit-summary'),
     progress: el('submit-progress'),
     progressBar: el('progress-bar'),
     progressFill: el('progress-fill'),
@@ -124,6 +125,23 @@
   }
 
   // ---------------------------------------------------------------- 通用 UI
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  /** 引用页面内联图标集里的一枚图标。 */
+  function icon(name) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'icon');
+    svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS(SVG_NS, 'use');
+    use.setAttribute('href', `#${name}`);
+    svg.appendChild(use);
+    return svg;
+  }
+
+  function textNode(text) {
+    return document.createTextNode(text);
+  }
 
   function showElement(node, visible) {
     if (!node) return;
@@ -270,7 +288,11 @@
       throw new Error('服务端返回的配置里没有朗读稿');
     }
     state.config = config;
-    setText(dom.targetSeconds, String(config.targetSeconds));
+    setText(
+      dom.recordTargetHint,
+      `每段目标约 ${config.targetSeconds} 秒（最短 ${config.minSeconds} 秒，最长 ${config.maxSeconds} 秒），` +
+        '尽量一次读完；读漏了可以单独重录这一段。'
+    );
 
     for (const segment of config.segments) {
       state.segments.set(segment.key, {
@@ -304,7 +326,26 @@
     for (const segment of state.segments.values()) {
       dom.segments.appendChild(buildSegmentCard(segment));
     }
+    renderSubmitSummary();
     updateUI();
+  }
+
+  /** 提交区的两段摘要（时长 + 状态），随录音状态刷新。 */
+  function renderSubmitSummary() {
+    dom.submitSummary.textContent = '';
+    for (const segment of state.segments.values()) {
+      const item = document.createElement('div');
+      item.className = 'summary-item';
+      const label = document.createElement('span');
+      label.className = 'k';
+      label.textContent = segment.label;
+      const value = document.createElement('span');
+      value.className = 'v is-missing';
+      value.textContent = '还没有录音';
+      item.append(label, value);
+      dom.submitSummary.appendChild(item);
+      if (segment.nodes) segment.nodes.summaryValue = value;
+    }
   }
 
   function buildSegmentCard(segment) {
@@ -313,7 +354,7 @@
     const percent = (value) => `${Math.max(0, Math.min(100, (value / max) * 100)).toFixed(2)}%`;
 
     const card = document.createElement('article');
-    card.className = 'card segment';
+    card.className = 'segment';
     card.dataset.key = segment.key;
 
     const head = document.createElement('header');
@@ -327,123 +368,114 @@
     titleWrap.appendChild(title);
 
     const status = document.createElement('span');
-    status.className = 'segment-status';
+    status.className = 'chip';
     status.textContent = '未录音';
     titleWrap.appendChild(status);
     head.appendChild(titleWrap);
-
-    const target = document.createElement('p');
-    target.className = 'segment-target hint';
-    target.textContent = `目标约 ${config.targetSeconds} 秒 · 最少 ${config.minSeconds} 秒 · 最长 ${max} 秒`;
-    head.appendChild(target);
-
     card.appendChild(head);
 
+    const body = document.createElement('div');
+    body.className = 'segment-body';
     const passage = document.createElement('p');
     passage.className = 'passage';
     passage.textContent = segment.text;
-    card.appendChild(passage);
+    body.appendChild(passage);
+    card.appendChild(body);
+
+    const controls = document.createElement('div');
+    controls.className = 'segment-controls';
+
+    const row = document.createElement('div');
+    row.className = 'control-row';
+
+    const recordButton = document.createElement('button');
+    recordButton.type = 'button';
+    recordButton.className = 'btn btn-primary btn-record';
+    recordButton.appendChild(icon('i-mic'));
+    const recordLabel = textNode('开始录音');
+    recordButton.appendChild(recordLabel);
+    recordButton.addEventListener('click', () => startRecording(segment.key));
+
+    const stopButton = document.createElement('button');
+    stopButton.type = 'button';
+    stopButton.className = 'btn btn-danger btn-stop hidden';
+    stopButton.appendChild(icon('i-stop'));
+    stopButton.appendChild(textNode('停止录音'));
+    stopButton.addEventListener('click', () => stopRecording(segment.key, false));
+
+    const timer = document.createElement('span');
+    timer.className = 'timer';
+    timer.setAttribute('aria-hidden', 'true');
+    timer.textContent = '0.0 秒';
+
+    const levelWrap = document.createElement('span');
+    levelWrap.className = 'level hidden';
+    levelWrap.setAttribute('aria-hidden', 'true');
+    const levelFill = document.createElement('span');
+    levelFill.className = 'level-fill';
+    levelWrap.appendChild(levelFill);
+
+    row.append(recordButton, stopButton, timer, levelWrap);
 
     const progressWrap = document.createElement('div');
     progressWrap.className = 'record-progress hidden';
 
     const bar = document.createElement('div');
-    bar.className = 'record-bar';
+    bar.className = 'progress-bar';
     bar.setAttribute('role', 'progressbar');
     bar.setAttribute('aria-label', `${segment.label}录音进度`);
     bar.setAttribute('aria-valuemin', '0');
     bar.setAttribute('aria-valuemax', String(max));
 
     const fill = document.createElement('div');
-    fill.className = 'record-fill';
+    fill.className = 'progress-fill';
     bar.appendChild(fill);
 
-    const tickMin = document.createElement('span');
-    tickMin.className = 'record-tick';
+    const tickMin = document.createElement('i');
+    tickMin.className = 'progress-tick';
     tickMin.style.left = `calc(${percent(config.minSeconds)} - 1px)`;
     tickMin.setAttribute('aria-hidden', 'true');
     bar.appendChild(tickMin);
 
-    const tickTarget = document.createElement('span');
-    tickTarget.className = 'record-tick is-target';
+    const tickTarget = document.createElement('i');
+    tickTarget.className = 'progress-tick is-target';
     tickTarget.style.left = `calc(${percent(config.targetSeconds)} - 1px)`;
     tickTarget.setAttribute('aria-hidden', 'true');
     bar.appendChild(tickTarget);
 
     const progressText = document.createElement('p');
-    progressText.className = 'record-progress-text hint';
+    progressText.className = 'progress-text';
 
-    progressWrap.appendChild(bar);
-    progressWrap.appendChild(progressText);
-    card.appendChild(progressWrap);
+    progressWrap.append(bar, progressText);
 
-    const levelWrap = document.createElement('div');
-    levelWrap.className = 'level-meter hidden';
-    levelWrap.setAttribute('aria-hidden', 'true');
-
-    const levelLabel = document.createElement('span');
-    levelLabel.className = 'level-label';
-    levelLabel.textContent = '输入电平';
-
-    const levelBar = document.createElement('div');
-    levelBar.className = 'level-bar';
-
-    const levelFill = document.createElement('div');
-    levelFill.className = 'level-fill';
-    levelBar.appendChild(levelFill);
-
-    levelWrap.appendChild(levelLabel);
-    levelWrap.appendChild(levelBar);
-    card.appendChild(levelWrap);
-
-    const actions = document.createElement('div');
-    actions.className = 'segment-actions';
-
-    const recordButton = document.createElement('button');
-    recordButton.type = 'button';
-    recordButton.className = 'primary';
-    recordButton.textContent = '开始录音';
-    recordButton.addEventListener('click', () => startRecording(segment.key));
-    actions.appendChild(recordButton);
-
-    const stopButton = document.createElement('button');
-    stopButton.type = 'button';
-    stopButton.textContent = '停止录音';
-    stopButton.disabled = true;
-    stopButton.addEventListener('click', () => stopRecording(segment.key, false));
-    actions.appendChild(stopButton);
-
-    const timer = document.createElement('span');
-    timer.className = 'timer';
-    timer.setAttribute('aria-hidden', 'true');
-    timer.textContent = '0.0 秒';
-    actions.appendChild(timer);
-
-    card.appendChild(actions);
+    const playerWrap = document.createElement('div');
+    playerWrap.className = 'player-wrap hidden';
 
     const player = document.createElement('audio');
     player.controls = true;
     player.preload = 'metadata';
-    player.className = 'player hidden';
-    card.appendChild(player);
+    player.className = 'player';
+    playerWrap.appendChild(player);
 
     const note = document.createElement('p');
     note.className = 'segment-note hidden';
-    card.appendChild(note);
 
     const liveNote = document.createElement('p');
     liveNote.className = 'segment-note is-warn hidden';
     liveNote.setAttribute('role', 'status');
-    card.appendChild(liveNote);
+
+    controls.append(row, progressWrap, playerWrap, note, liveNote);
+    card.appendChild(controls);
 
     segment.nodes = {
       card,
       status,
-      target,
       recordButton,
+      recordLabel,
       stopButton,
       timer,
       player,
+      playerWrap,
       note,
       liveNote,
       progressWrap,
@@ -907,51 +939,52 @@
     if (!state.config) return;
 
     const minSeconds = state.config.minSeconds;
+    const targetSeconds = state.config.targetSeconds;
     const problems = [];
 
     for (const segment of state.segments.values()) {
       const { nodes } = segment;
       if (!nodes) continue;
+      const hasBlob = !!segment.blob;
 
       if (segment.recording) {
-        nodes.status.textContent = '录音中……';
-        nodes.status.classList.add('recording');
-        nodes.status.classList.remove('done');
-        nodes.recordButton.disabled = true;
-        nodes.recordButton.textContent = '录音中';
-        nodes.stopButton.disabled = false;
-        nodes.player.classList.add('hidden');
+        nodes.status.textContent = '录音中';
+        nodes.status.className = 'chip is-recording';
+        nodes.recordButton.classList.add('hidden');
+        nodes.stopButton.classList.remove('hidden');
+        nodes.playerWrap.classList.add('hidden');
         nodes.note.classList.add('hidden');
         nodes.card.classList.add('is-active');
         showElement(nodes.progressWrap, true);
+        showElement(nodes.levelWrap, true);
         showElement(nodes.liveNote, segment.silenceWarned);
       } else if (segment.pending) {
         // 正在等 getUserMedia：明确反馈并挡住重复点击
-        nodes.status.textContent = '准备中……';
-        nodes.status.classList.remove('recording');
-        nodes.status.classList.remove('done');
-        nodes.recordButton.disabled = true;
-        nodes.recordButton.textContent = '准备中……';
-        nodes.stopButton.disabled = true;
-        nodes.player.classList.add('hidden');
+        nodes.status.textContent = '准备中';
+        nodes.status.className = 'chip';
+        nodes.recordButton.classList.add('hidden');
+        nodes.stopButton.classList.add('hidden');
+        nodes.playerWrap.classList.add('hidden');
         nodes.note.classList.add('hidden');
         nodes.card.classList.remove('is-active');
         showElement(nodes.progressWrap, false);
+        showElement(nodes.levelWrap, false);
         showElement(nodes.liveNote, false);
       } else {
-        nodes.status.classList.remove('recording');
-        nodes.stopButton.disabled = true;
-        nodes.recordButton.disabled = state.busy || state.starting;
+        nodes.status.className = hasBlob ? 'chip is-done' : 'chip';
+        nodes.stopButton.classList.add('hidden');
         nodes.card.classList.remove('is-active');
         showElement(nodes.progressWrap, false);
+        showElement(nodes.levelWrap, false);
         showElement(nodes.liveNote, false);
+        nodes.recordButton.disabled = state.busy || state.starting;
 
-        if (segment.blob) {
-          nodes.status.textContent = `已录制 ${formatSeconds(segment.seconds)}`;
-          nodes.status.classList.add('done');
-          nodes.recordButton.textContent = '重新录制';
+        if (hasBlob) {
+          nodes.status.textContent = `已录 ${formatSeconds(segment.seconds)}`;
+          nodes.recordLabel.nodeValue = '重新录制';
+          nodes.recordButton.classList.remove('hidden');
           nodes.player.src = segment.url;
-          nodes.player.classList.remove('hidden');
+          nodes.playerWrap.classList.remove('hidden');
           if (segment.seconds < minSeconds) {
             nodes.note.textContent = `这段录音只有 ${formatSeconds(segment.seconds)}，短于要求的 ${minSeconds} 秒，请重录。`;
             nodes.note.classList.add('is-warn');
@@ -963,14 +996,37 @@
           }
         } else {
           nodes.status.textContent = '未录音';
-          nodes.status.classList.remove('done');
-          nodes.recordButton.textContent = '开始录音';
-          nodes.player.classList.add('hidden');
-          nodes.note.textContent = `请朗读这段文字，录满 ${state.config.targetSeconds} 秒左右。`;
+          nodes.recordLabel.nodeValue = '开始录音';
+          nodes.recordButton.classList.remove('hidden');
+          nodes.playerWrap.classList.add('hidden');
+          nodes.note.textContent = `请朗读这段文字，录满 ${targetSeconds} 秒左右。`;
           nodes.note.classList.remove('is-warn');
           nodes.note.classList.remove('hidden');
           problems.push(`${segment.label}还没有录音`);
         }
+      }
+
+      if (nodes.summaryValue) {
+        if (segment.recording || segment.pending) {
+          nodes.summaryValue.textContent = segment.pending ? '准备中……' : '录音中……';
+          nodes.summaryValue.className = 'v is-missing';
+        } else if (!hasBlob) {
+          nodes.summaryValue.textContent = '还没有录音';
+          nodes.summaryValue.className = 'v is-missing';
+        } else if (segment.seconds < minSeconds) {
+          nodes.summaryValue.textContent = `已录 ${formatSeconds(segment.seconds)}（太短）`;
+          nodes.summaryValue.className = 'v is-warn';
+        } else {
+          nodes.summaryValue.textContent = `已录 ${formatSeconds(segment.seconds)}`;
+          nodes.summaryValue.className = 'v';
+        }
+      }
+
+      nodes.card.classList.toggle('has-take', !!segment.blob);
+
+      // 停止后用实测时长刷新计时，保证与徽标、摘要一致
+      if (!segment.recording && !segment.pending) {
+        nodes.timer.textContent = formatSeconds(hasBlob ? segment.seconds : 0);
       }
     }
 

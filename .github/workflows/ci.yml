@@ -1,0 +1,56 @@
+# CI：PR 时执行，只校验本次改动到的子项目。
+#
+# 约定见根 AGENTS.md 5.2 / 5.3；配置与服务器准备见 deploy/README.md。
+# 注意：本文件位于仓库根 .github/，是经用户批准的唯一根目录结构例外（AGENTS.md 21.2）。
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  changed-projects:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码（diff 需要完整历史）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 找出改动到的子项目
+        id: changed
+        run: |
+          set -eu
+          projects=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+            | awk -F/ 'NF > 1 { print $1 }' | sort -u | tr '\n' ' ')
+          echo "projects=$projects" >> "$GITHUB_OUTPUT"
+          echo "改动目录：${projects:-（无子项目改动）}"
+
+      - name: 校验 deploy（共享设施）
+        if: contains(steps.changed.outputs.projects, 'deploy')
+        run: |
+          set -eu
+          sh -n deploy/scripts/deploy.sh
+          cp deploy/proxy/Caddyfile.example deploy/proxy/Caddyfile
+          docker compose -f deploy/proxy/docker-compose.yml config --quiet
+          rm deploy/proxy/Caddyfile
+          echo "deploy 校验通过"
+
+      - name: 校验 recording（语法 + compose）
+        if: contains(steps.changed.outputs.projects, 'recording')
+        working-directory: recording
+        run: |
+          set -eu
+          for f in server/*.js server/routes/*.js public/*.js; do
+            node --check "$f"
+          done
+          docker compose -f docker-compose.yml config --quiet
+          echo "recording 语法与 compose 校验通过"
+
+      - name: 构建 recording 镜像（可部署单元）
+        if: contains(steps.changed.outputs.projects, 'recording')
+        run: docker build -t recording:ci recording/
