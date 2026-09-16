@@ -1,17 +1,37 @@
-# 反向代理配置模板。复制为 Caddyfile 后按实际域名修改：
+# 反向代理配置模板。复制为 Caddyfile 后按实际情况修改：
 #   cp Caddyfile.example Caddyfile
 #
 # 路由目标一律指向宿主端口（见 ../ports.md），
 # 代理容器通过 host.docker.internal 访问宿主上各子项目映射的端口。
+#
+# 两种用法选一种，删掉另一种：
+#   1) 没有域名（当前场景）：内网 IP + 自签证书（Caddy 内部 CA）
+#   2) 有域名：域名 + 自动 HTTPS
 
-# ---- 纯 HTTP（域名 / 证书未确定时的默认方案）----
-:80 {
-	# recording：员工端与管理端
+# ============ 用法 1：无域名，IP + 自签证书 ============
+# 把 192.168.3.30 换成服务器内网 IP。
+# default_sni 必须写：浏览器访问 IP 时不发送 SNI，缺了它 TLS 握手会失败
+# （实测：没有 default_sni 时 curl/浏览器直接收到 tls internal error）。
+{
+	default_sni 192.168.3.30
+}
+
+https://192.168.3.30 {
+	tls internal
 	reverse_proxy host.docker.internal:3000
 }
 
-# ---- 域名 + 自动 HTTPS（域名解析与 443 可达后启用）----
-# 启用时删掉上面的 :80 块，并按子项目分别配置：
+# 说明：
+#   - 员工通过 https://192.168.3.30 访问（443）；要换端口就写成
+#     https://192.168.3.30:8443，并在 proxy/docker-compose.yml 加端口映射。
+#   - 浏览器首次访问会提示"证书不受信任"，点"继续前往"即可正常录音；
+#     想消掉提示，把 Caddy 的根证书装到员工电脑的"受信任的根证书颁发机构"：
+#       docker compose -f deploy/proxy/docker-compose.yml exec caddy \
+#         cat /data/caddy/pki/authorities/local/root.crt
+#   - 员工端录音要求 HTTPS：http://<IP> 会被浏览器判定为非安全上下文，拿不到麦克风。
+
+# ============ 用法 2：有域名 + 自动 HTTPS ============
+# 域名解析与 80/443 可达后启用：
 #
 # recording.example.com {
 # 	reverse_proxy host.docker.internal:3000

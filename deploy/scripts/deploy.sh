@@ -39,13 +39,20 @@ deploy_one() {
     exit 1
   fi
 
+  if [ "$name" = "proxy" ] && [ ! -f "$dir/Caddyfile" ]; then
+    echo "反向代理还没配置：先复制并填写配置文件——" >&2
+    echo "  cp deploy/proxy/Caddyfile.example deploy/proxy/Caddyfile" >&2
+    echo "  说明见 deploy/README.md（无域名场景用 Caddyfile 里的「用法 1」）" >&2
+    exit 1
+  fi
+
   file=$(compose_file "$dir") || {
-    echo "找不到 $name 的 compose 文件（$dir）" >&2
+    echo "找不到 ${name} 的 compose 文件（${dir}）" >&2
     echo "子项目需要自带 docker-compose.yml / compose.yml，见根 AGENTS.md 5.3。" >&2
     exit 1
   }
 
-  echo "==> 部署 $name（$file）"
+  echo "==> 部署 ${name}（${file}）"
   docker compose -f "$file" up -d --build
 }
 
