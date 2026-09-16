@@ -15,6 +15,9 @@
 
 ## 怎么用
 
+完整的分步教程（Ubuntu 服务器、无域名、含全部命令）：
+[`UBUNTU.md`](./UBUNTU.md)。
+
 在服务器上的仓库根目录执行：
 
 ```bash
@@ -28,9 +31,25 @@
 ```bash
 cd deploy/proxy
 cp Caddyfile.example Caddyfile
-# 编辑 Caddyfile：填域名 / 路由；启用 HTTPS 需要域名解析与 80/443 可达
+# 无域名（当前场景）：按模板"用法 1"填服务器内网 IP；
+#   default_sni 必须填，否则浏览器访问 IP 时 TLS 握手会失败（已实测）。
+# 有域名：按模板"用法 2"，域名解析与 80/443 可达后自动签发证书。
 ../scripts/deploy.sh proxy
 ```
+
+> **员工端录音必须走 HTTPS。** 浏览器只在 HTTPS（或 localhost）下给麦克风，
+> 用 `http://<IP>:3000` 打开员工端会提示"不是安全上下文"、无法录音。
+> 没有域名也能用 HTTPS：Caddy 的 `tls internal` 会对 IP 签发自签证书（已实测
+> `isSecureContext=true` 且可正常录音）。首次访问点"继续前往"即可；
+> 想消掉证书警告，把 Caddy 根证书装进员工电脑的受信任根证书：
+>
+> ```bash
+> docker compose -f deploy/proxy/docker-compose.yml exec caddy \
+>   cat /data/caddy/pki/authorities/local/root.crt
+> ```
+>
+> 管理端不依赖麦克风，HTTP 直连 `http://<IP>:3000/admin.html` 也能用；
+> 但员工入口地址应发 HTTPS 的那个。
 
 ## 约定（与根 `AGENTS.md` 5.3 一致）
 
