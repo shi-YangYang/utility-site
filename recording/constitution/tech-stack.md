@@ -141,14 +141,20 @@ npm start       # 启动服务，默认 http://localhost:3000
 - **国内网络的已知障碍：** Docker Hub 的鉴权服务（`auth.docker.io`）常被 DNS 污染，
   导致构建在拉基础镜像阶段就超时失败。处置办法（配 registry mirror 或走本机代理）
   写在 `README.md` 的「拉不到基础镜像怎么办」一节。首次构建曾实际遇到此问题。
+- **Debian 软件源可覆盖**（2026-09-16）：`Dockerfile` 用 `ARG APT_MIRROR`
+  （默认上游 `deb.debian.org`），`docker-compose.yml` 透传；
+  国内服务器在 `recording/.env` 设 `APT_MIRROR=mirrors.cloud.tencent.com`
+  （备选 `mirrors.tuna.tsinghua.edu.cn`，实测容器内可用），
+  避免 apt 装 ffmpeg 时从上游慢速下载。仓库默认值保持中立，不绑定某个云厂商。
 
 ## 待确认项（不要替用户决定）
 
-1. **CI 配置放在哪里。** GitHub Actions 的 workflow 文件只能位于仓库根目录的
-   `.github/workflows/`，而工具站根规范第 2 节规定根目录只放三份文档。
-   这是一个全站级结构决策，需要用户单独批准，本项目不得擅自创建根目录 `.github/`。
-2. **部署环境与 HTTPS。** 目前确认"先在本机跑通"；将来部署到内网还是公网、
-   证书怎么来，尚未决定。
+1. ~~CI 配置放在哪里。~~ **已决定（2026-09-16）**：用户批准仓库根目录 `.github/`
+   作为唯一结构例外；`ci.yml` / `cd.yml` 已就位，说明见 `deploy/README.md`。
+2. **部署环境与 HTTPS。** **已定（2026-09-16）**：公司内网一台腾讯云 Ubuntu 服务器
+   （无域名），访问采用内网 IP + Caddy 自签证书提供 HTTPS
+   （员工端录音要求 secure context；已实测 `https://<IP>` 可正常录音）。
+   服务器上的具体路径、证书信任分发（是否把 Caddy 根证书装到员工电脑）由使用者决定。
 3. **正式朗读稿采信度。** 当前文稿是 Agent 生成的占位稿（覆盖常用音素与四声），
    用户尚未确认这就是最终版本。
 4. **下游对音频格式的具体要求。** 当前按"16 kHz 单声道 WAV"交付，

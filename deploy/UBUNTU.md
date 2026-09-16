@@ -119,13 +119,18 @@ openssl rand -hex 4
 nano recording/.env
 ```
 
-修改下面两行（把生成的管理口令记下来）：
+修改下面三行（把生成的管理口令记下来）：
 
 ```ini
 EMPLOYEE_CODE=给员工的口令
 ADMIN_CODE=生成的管理端口令
+APT_MIRROR=mirrors.cloud.tencent.com
 ```
 
+> `APT_MIRROR` 让镜像构建时用国内 Debian 源装 ffmpeg（默认走上游，国内会很慢）。
+> 腾讯云服务器首选 `mirrors.cloud.tencent.com`；如果构建长时间卡在 apt 没有下载进度
+> （腾讯源会 302 跳到 https，个别网络下 apt 跟不过去），改成
+> `mirrors.tuna.tsinghua.edu.cn`（清华源，已实测容器内可用）。
 > `.env` 不进仓库；从仓库根执行部署脚本也会正确读取 `recording/.env`。
 > 若 3000 端口被占用，再加一行 `HOST_PORT=3001`，并同步登记 `deploy/ports.md`。
 
