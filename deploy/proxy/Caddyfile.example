@@ -30,6 +30,17 @@ https://192.168.1.10 {
 #         cat /data/caddy/pki/authorities/local/root.crt
 #   - 员工端录音要求 HTTPS：http://<IP> 会被浏览器判定为非安全上下文，拿不到麦克风。
 
+# ============ 用法 1b：第二个及以后的子项目（端口区分）============
+# 需要 HTTPS 的项目才走代理；先确认端口已在 ../ports.md 登记，
+# 并把对外端口加进 proxy/docker-compose.yml 的端口映射（如 "3100:3100"）。
+#
+# https://192.168.1.10:3100 {
+# 	tls internal
+# 	reverse_proxy host.docker.internal:3001
+# }
+#
+# 说明：tls internal 的证书按 IP 签发，多端口共用同一张，不需要重复申请。
+
 # ============ 用法 2：有域名 + 自动 HTTPS ============
 # 域名解析与 80/443 可达后启用：
 #

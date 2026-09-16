@@ -93,7 +93,9 @@ Agent 结构 负责「Agent 怎么开发这个项目」—— AGENTS.md、consti
 - **子项目自备可部署单元**：`Dockerfile`、本项目的 `docker-compose.yml`、
   环境变量与数据卷说明，由该子项目的实现者维护；服务器共享设施不由子项目负责。
 - **端口先登记再使用**：在 [`deploy/ports.md`](./deploy/ports.md) 登记宿主端口，
-  不得与已分配端口冲突。
+  不得与已分配端口冲突。多个子项目并存时**按端口区分**：应用端口仅本机使用，
+  需要 HTTPS 的项目由共享代理在对外端口上提供服务（约定与接线流程见
+  `deploy/README.md` 与 `deploy/ports.md`）。
 - **共享设施只改 `deploy/`**：代理路由、证书、网络等改动都在该子项目内完成。
 - **凭据不进仓库**：服务器上的 `.env`、证书与密钥由使用者保管，仓库只放样例与说明。
 - **部署命令**：`./deploy/scripts/deploy.sh <子项目名|proxy|all>`，

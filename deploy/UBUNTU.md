@@ -250,6 +250,17 @@ crontab -e
 
 ---
 
+## 10. 以后新增子项目（端口区分）
+
+一台服务器可以挂多个子项目，规则与接线流程见 [`ports.md`](./ports.md)：
+
+1. 在 `ports.md` 登记两个端口：应用端口（3001 起，仅本机）与对外端口（3100 起，Caddy）。
+2. 需要 HTTPS 的项目：在 `deploy/proxy/docker-compose.yml` 加映射（如 `"3100:3100"`），
+   并在 `deploy/proxy/Caddyfile` 加一段 `https://<服务器IP>:3100 { tls internal; reverse_proxy host.docker.internal:3001 }`。
+3. 纯展示工具（不需要麦克风）：不进代理，直接用 `http://<服务器IP>:3001`。
+4. 安全组只放行对外端口；然后 `./deploy/scripts/deploy.sh proxy` 与
+   `./deploy/scripts/deploy.sh <项目名>`。
+
 ## 常见问题
 
 | 现象 | 处理 |
