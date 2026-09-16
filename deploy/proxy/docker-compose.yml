@@ -1,0 +1,24 @@
+# 全站反向代理（共享设施）
+#
+# 使用前：把 Caddyfile.example 复制为 Caddyfile 并按实际域名 / 路由修改。
+# 端口分配见 ../ports.md。
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    extra_hosts:
+      # 让代理容器能通过 host.docker.internal 访问宿主上各子项目映射的端口
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  caddy-data:
+  caddy-config:

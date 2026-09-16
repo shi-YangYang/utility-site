@@ -1,0 +1,26 @@
+# 反向代理配置模板。复制为 Caddyfile 后按实际域名修改：
+#   cp Caddyfile.example Caddyfile
+#
+# 路由目标一律指向宿主端口（见 ../ports.md），
+# 代理容器通过 host.docker.internal 访问宿主上各子项目映射的端口。
+
+# ---- 纯 HTTP（域名 / 证书未确定时的默认方案）----
+:80 {
+	# recording：员工端与管理端
+	reverse_proxy host.docker.internal:3000
+}
+
+# ---- 域名 + 自动 HTTPS（域名解析与 443 可达后启用）----
+# 启用时删掉上面的 :80 块，并按子项目分别配置：
+#
+# recording.example.com {
+# 	reverse_proxy host.docker.internal:3000
+# }
+#
+# 同一域名下按路径区分多个子项目时：
+# example.com {
+# 	handle_path /recording/* {
+# 		reverse_proxy host.docker.internal:3000
+# 	}
+# 	# 后续子项目继续追加 handle_path 块
+# }
