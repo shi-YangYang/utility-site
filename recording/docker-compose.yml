@@ -15,6 +15,9 @@ services:
   recording:
     build:
       context: .
+      args:
+        # Debian 软件源；国内服务器在 .env 设 APT_MIRROR=mirrors.cloud.tencent.com
+        APT_MIRROR: "${APT_MIRROR:-deb.debian.org}"
     image: recording:latest
     container_name: recording
     restart: unless-stopped

@@ -1,15 +1,25 @@
 # recording —— 语音样本采集服务
 #
-# 注意：本文件尚未在真实环境构建验证过（开发机上没有 Docker）。
-# 首次使用前请自行 `docker build` 确认，详见 README.md 的「Docker」一节。
+# 已在 Docker Desktop（macOS arm64）与腾讯云 Ubuntu 服务器实际构建验证；
+# 使用说明见 README.md 的「Docker」一节。
 
 FROM node:22-bookworm-slim
+
+# Debian 软件源默认走上游；国内服务器通过构建参数覆盖，避免从 deb.debian.org 慢速下载。
+# 覆盖方式：在 recording/.env 里设 APT_MIRROR=mirrors.cloud.tencent.com（见 .env.example）。
+ARG APT_MIRROR=deb.debian.org
+
+RUN set -eu; \
+    for f in /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources; do \
+      [ -f "$f" ] || continue; \
+      sed -i "s|deb.debian.org|${APT_MIRROR}|g; s|security.debian.org|${APT_MIRROR}|g" "$f"; \
+    done
 
 # ffmpeg 是本服务唯一的重外部依赖：浏览器录出的音频要靠它统一转成 WAV。
 #
 # 为什么带 Acquire::Retries：ffmpeg 在 Debian 上有近 200 个依赖、要下 120MB，
-# 而 deb.debian.org 走 Fastly CDN，偶发 502 会让整层重来一次（实测踩到过：
-# 198 个包里挂了 1 个，前功尽弃）。让 apt 自己重试，比人工重跑整个 build 划算。
+# 偶发 502 会让整层重来一次（实测踩到过：198 个包里挂了 1 个，前功尽弃）。
+# 让 apt 自己重试，比人工重跑整个 build 划算。
 #
 # 装完顺手清掉 apt 缓存，别让镜像白胖几十 MB。
 RUN apt-get update -o Acquire::Retries=5 \
