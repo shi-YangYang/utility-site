@@ -1,8 +1,8 @@
 # Ubuntu 服务器部署教程
 
-> 场景：一台 Ubuntu 服务器（内网地址 `172.17.0.17`），没有域名；
+> 场景：一台 Ubuntu 服务器（内网地址 `<服务器IP>`），没有域名；
 > 员工与管理端通过浏览器访问：
-> 员工 `https://172.17.0.17/`，管理端 `https://172.17.0.17/admin.html`。
+> 员工 `https://<服务器IP>/`，管理端 `https://<服务器IP>/admin.html`。
 >
 > 以下命令**全部在服务器上执行**（先在你自己电脑上 SSH 登录）。
 > 首次部署按顺序走完第 0–7 步即可。
@@ -12,7 +12,7 @@
 ## 0. 登录与前置检查
 
 ```bash
-ssh <你的用户名>@172.17.0.17
+ssh <你的用户名>@<服务器IP>
 ```
 
 ```bash
@@ -162,20 +162,21 @@ curl -s http://127.0.0.1:3000/api/config | head -c 80
 ```bash
 cd /srv/utility-site/deploy/proxy
 cp Caddyfile.example Caddyfile
-sed -i "s/192\.168\.3\.30/172.17.0.17/g" Caddyfile
+SERVER_IP=<你的服务器IP>        # ← 只改这一行（去掉尖括号），例如 192.168.1.50
+sed -i "s/192\.168\.1\.10/$SERVER_IP/g" Caddyfile
 grep -n "default_sni\|tls internal" Caddyfile
 ```
 
-确认输出包含 `default_sni 172.17.0.17` 与 `tls internal`，然后启动代理：
+确认输出包含 `default_sni <你的服务器IP>` 与 `tls internal`，然后启动代理：
 
 ```bash
 cd /srv/utility-site
 ./deploy/scripts/deploy.sh proxy
-curl -k https://172.17.0.17/api/config | head -c 80
+curl -k https://<服务器IP>/api/config | head -c 80
 ```
 
 > `default_sni` 不能删：浏览器访问 IP 时不发 SNI，缺了它 TLS 握手会失败（已实测）。
-> 员工首次打开 `https://172.17.0.17/` 会提示"证书不受信任"，点「高级 → 继续前往」即可正常录音。
+> 员工首次打开 `https://<服务器IP>/` 会提示"证书不受信任"，点「高级 → 继续前往」即可正常录音。
 
 想消掉证书警告（可选）：导出 Caddy 根证书，装到员工电脑的「受信任的根证书颁发机构」。
 
@@ -202,8 +203,8 @@ sudo ufw status
 
 ## 7. 验收
 
-1. 手机/电脑打开 `https://172.17.0.17/` → 输员工口令 → 填姓名 → 录中英文各一段 → 试听 → 提交。
-2. 打开 `https://172.17.0.17/admin.html` → 输管理口令 → 列表可见记录，能试听、下载。
+1. 手机/电脑打开 `https://<服务器IP>/` → 输员工口令 → 填姓名 → 录中英文各一段 → 试听 → 提交。
+2. 打开 `https://<服务器IP>/admin.html` → 输管理口令 → 列表可见记录，能试听、下载。
 3. 服务器上查看日志：
 
 ```bash
@@ -227,7 +228,7 @@ git pull --ff-only
 1. 在本机生成专用密钥：`ssh-keygen -t ed25519 -f ~/github-cd -N ""`
 2. 公钥追加到服务器：`cat ~/github-cd.pub >> ~/.ssh/authorized_keys`
 3. GitHub 仓库 → Settings → Secrets and variables → Actions：
-   - Secret：`SSH_HOST` = `172.17.0.17`；`SSH_USER` = 你的登录用户；`SSH_KEY` = `~/github-cd` 私钥全文
+   - Secret：`SSH_HOST` = `<服务器IP>`；`SSH_USER` = 你的登录用户；`SSH_KEY` = `~/github-cd` 私钥全文
    - Variable：`DEPLOY_PATH` = `/srv/utility-site`
 4. 之后：`dev` 开发 → 发 PR（CI 校验改动项）→ 合并 `main` → CD 自动部署。
 5. 未配置凭据时 CD 会跳过并提示；也可在 Actions 里手动运行 CD 补部署。
@@ -249,14 +250,25 @@ crontab -e
 
 ---
 
+## 10. 以后新增子项目（端口区分）
+
+一台服务器可以挂多个子项目，规则与接线流程见 [`ports.md`](./ports.md)：
+
+1. 在 `ports.md` 登记两个端口：应用端口（3001 起，仅本机）与对外端口（3100 起，Caddy）。
+2. 需要 HTTPS 的项目：在 `deploy/proxy/docker-compose.yml` 加映射（如 `"3100:3100"`），
+   并在 `deploy/proxy/Caddyfile` 加一段 `https://<服务器IP>:3100 { tls internal; reverse_proxy host.docker.internal:3001 }`。
+3. 纯展示工具（不需要麦克风）：不进代理，直接用 `http://<服务器IP>:3001`。
+4. 安全组只放行对外端口；然后 `./deploy/scripts/deploy.sh proxy` 与
+   `./deploy/scripts/deploy.sh <项目名>`。
+
 ## 常见问题
 
 | 现象 | 处理 |
 |---|---|
-| 员工端提示"不是安全上下文" | 用 `https://172.17.0.17/`，不要用 `http://172.17.0.17:3000` |
+| 员工端提示"不是安全上下文" | 用 `https://<服务器IP>/`，不要用 `http://<服务器IP>:3000` |
 | 浏览器证书警告 | 点「继续前往」；或安装 Caddy 根证书（见第 5 步） |
 | TLS 握手失败 / ERR_SSL | Caddyfile 缺 `default_sni`，或 IP 没替换成功 |
 | 执行 docker 报 permission denied | `newgrp docker` 或退出重新登录 |
 | 数据目录不可写 | `sudo chown -R 1000:1000 recording/data` |
 | 3000 被占用 | `recording/.env` 设 `HOST_PORT=3001`，并在 `deploy/ports.md` 登记 |
-| 员工手机打不开页面 | 确认手机与服务器网络互通（`172.17.0.17` 需在内网/VPN 可达范围内） |
+| 员工手机打不开页面 | 确认手机与服务器网络互通（`<服务器IP>` 需在内网/VPN 可达范围内） |

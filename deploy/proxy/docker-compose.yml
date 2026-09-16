@@ -11,6 +11,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # 第二个及以后的 HTTPS 子项目：在这里加对外端口，并在 Caddyfile 加对应站点段。
+      # 端口一律先在 ../ports.md 登记。示例：
+      # - "3100:3100"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
