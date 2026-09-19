@@ -1,15 +1,11 @@
-# CD：合并到 main 后执行，按改动目录通过 SSH 部署到服务器。
-# 只在"会影响部署"的路径上触发与部署：
-#   - recording/**            → 部署 recording（若有 compose；否则跳过）
-#   - deploy/proxy/**         → 部署共享代理
-#   - deploy/scripts/**       → 部署全部（all）
-#   - 其他（含 deploy 下文档、App 类子项目、.github）→ 不触发、不部署
+# CD：只在手动触发时执行（Actions → CD → Run workflow），合并到 main 不会自动部署。
 #
-# - 新增需要服务器部署的子项目时：在下面 on.push.paths 加一行它的目录，
-#   并在 deploy/ports.md 登记端口（说明见 deploy/README.md）；
+# 规则（用户 2026-09-19 定）：只有明确需要部署时才运行本工作流，目标可选
+# 子项目名 / proxy / all，原样交给 deploy/scripts/deploy.sh 执行；
+# 目标没有 docker-compose.yml / compose.yml 时脚本会明确报错。
+#
 # - 服务器凭据（SSH_HOST / SSH_USER / SSH_KEY）未配置时跳过并提示，不失败；
-# - 还需要仓库变量 DEPLOY_PATH（服务器上仓库的绝对路径）；
-# - 手动补部署：Actions 里手动运行本工作流，填 project（如 recording / proxy / all）。
+# - 还需要仓库变量 DEPLOY_PATH（服务器上仓库的绝对路径）。
 #
 # 约定见根 AGENTS.md 5.2 / 5.3；服务器准备与凭据配置见 deploy/README.md。
 # 本文件位于仓库根 .github/，是经用户批准的唯一根目录结构例外（AGENTS.md 21.2）。
@@ -17,12 +13,6 @@
 name: CD
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'recording/**'
-      - 'deploy/proxy/**'
-      - 'deploy/scripts/**'
   workflow_dispatch:
     inputs:
       project:
@@ -34,62 +24,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-main
+  group: deploy-manual
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: 检出代码（diff 需要完整历史）
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 确定部署目标
-        id: targets
-        run: |
-          set -eu
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            targets="${{ inputs.project }}"
-          else
-            before="${{ github.event.before }}"
-            if [ "$before" = "0000000000000000000000000000000000000000" ]; then
-              changed=""
-            else
-              changed=$(git diff --name-only "$before...HEAD")
-            fi
-            targets=""
-            for p in $changed; do
-              case "$p" in
-                .github/*) : ;;                    # 仅流水线自身变化，不影响运行中的服务
-                deploy/proxy/*) targets="$targets proxy" ;;
-                deploy/scripts/*) targets="$targets all" ;;
-                deploy/*) : ;;                     # deploy 下的文档改动：不部署
-                */*) targets="$targets ${p%%/*}" ;; # 子项目：下面按是否有 compose 过滤
-              esac
-            done
-            deployable=""
-            for t in $targets; do
-              case "$t" in
-                all|proxy)
-                  deployable="$deployable $t"
-                  ;;
-                *)
-                  if [ -f "$t/docker-compose.yml" ] || [ -f "$t/compose.yml" ]; then
-                    deployable="$deployable $t"
-                  else
-                    echo "::notice::跳过 $t：没有 docker-compose.yml / compose.yml（非可部署子项目）"
-                  fi
-                  ;;
-              esac
-            done
-            targets="$deployable"
-          fi
-          targets=$(printf '%s\n' $targets | sort -u | tr '\n' ' ')
-          echo "targets=$targets" >> "$GITHUB_OUTPUT"
-          echo "部署目标：${targets:-（无）}"
-
       - name: 检查服务器凭据是否已配置
         id: creds
         env:
@@ -105,13 +46,13 @@ jobs:
           fi
 
       - name: SSH 部署到服务器
-        if: steps.creds.outputs.ready == 'true' && steps.targets.outputs.targets != ''
+        if: steps.creds.outputs.ready == 'true'
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_KEY: ${{ secrets.SSH_KEY }}
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-          TARGETS: ${{ steps.targets.outputs.targets }}
+          TARGET: ${{ inputs.project }}
         run: |
           set -eu
           if [ -z "${DEPLOY_PATH:-}" ]; then
@@ -122,9 +63,7 @@ jobs:
           chmod 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          for t in $TARGETS; do
-            echo "==> 部署 $t"
-            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
-              "$SSH_USER@$SSH_HOST" \
-              "cd '$DEPLOY_PATH' && git pull --ff-only && ./deploy/scripts/deploy.sh $t"
-          done
+          echo "==> 部署 $TARGET"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            "$SSH_USER@$SSH_HOST" \
+            "cd '$DEPLOY_PATH' && git pull --ff-only && ./deploy/scripts/deploy.sh $TARGET"

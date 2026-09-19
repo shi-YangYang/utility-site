@@ -17,7 +17,8 @@
 
 ## 协作规则
 
-- 默认在 `dev` 开发，PR 合并到 `main`；CI 只校验 PR 改动的子项目，CD 在合并后部署
+- 默认在 `dev` 开发，PR 合并到 `main`；CI 只校验 PR 改动的子项目；部署需在
+  Actions 里手动运行 CD（合并不会自动部署）
 - 新增工具：建 kebab-case 文件夹 + `README.md`，并在本文工具清单与
   [AGENTS.md](./AGENTS.md) 的「当前子项目」表各登记一行
 - 一次提交只包含一个子项目的改动
