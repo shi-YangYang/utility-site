@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +19,7 @@ import { Colors, Radius, Spacing } from '@/constants/theme';
 import { listCategories } from '@/db/categories';
 import { listPlatforms } from '@/db/platforms';
 import { DEFAULT_CATEGORIES, DEFAULT_PLATFORMS } from '@/lib/categories';
+import { normalizeTxTime, nowAsTxTime, txTimeToDisplay } from '@/lib/dates';
 import { validateFormValues, type RecordFormValues, type ValidatedForm } from '@/lib/form';
 import type { Direction } from '@/lib/types';
 
@@ -49,6 +52,7 @@ export function RecordForm({
   const [categories, setCategories] = useState<string[]>([...DEFAULT_CATEGORIES]);
   const [platforms, setPlatforms] = useState<string[]>([...DEFAULT_PLATFORMS]);
   const [previewRatio, setPreviewRatio] = useState<number | null>(null);
+  const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
   const insets = useSafeAreaInsets();
 
   useFocusEffect(
@@ -81,6 +85,44 @@ export function RecordForm({
 
   function patch(changes: Partial<RecordFormValues>) {
     setValues((prev) => ({ ...prev, ...changes }));
+  }
+
+  function currentPickerDate(): Date {
+    const normalized = normalizeTxTime(values.txTime);
+    return normalized ? new Date(normalized) : new Date();
+  }
+
+  function handleDateChange(event: DateTimePickerEvent, date?: Date) {
+    if (event.type !== 'set' || !date) {
+      setPickerMode(null);
+      return;
+    }
+    const base = currentPickerDate();
+    const merged = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      base.getHours(),
+      base.getMinutes(),
+    );
+    patch({ txTime: txTimeToDisplay(nowAsTxTime(merged)) });
+    if (showTimeHint) setShowTimeHint(false);
+    setPickerMode('time');
+  }
+
+  function handleTimeChange(event: DateTimePickerEvent, date?: Date) {
+    setPickerMode(null);
+    if (event.type !== 'set' || !date) return;
+    const base = currentPickerDate();
+    const merged = new Date(
+      base.getFullYear(),
+      base.getMonth(),
+      base.getDate(),
+      date.getHours(),
+      date.getMinutes(),
+    );
+    patch({ txTime: txTimeToDisplay(nowAsTxTime(merged)) });
+    if (showTimeHint) setShowTimeHint(false);
   }
 
   function handleSubmit() {
@@ -197,19 +239,36 @@ export function RecordForm({
       />
 
       <Text style={styles.label}>时间</Text>
-      <TextInput
-        style={styles.input}
-        value={values.txTime}
-        onChangeText={(text) => {
-          patch({ txTime: text });
-          if (showTimeHint) setShowTimeHint(false);
-        }}
-        placeholder="2026-09-18 12:30"
-        placeholderTextColor={Colors.subText}
-        autoCapitalize="none"
-      />
+      <View style={styles.timeRow}>
+        <TextInput
+          style={[styles.input, styles.timeInput]}
+          value={values.txTime}
+          onChangeText={(text) => {
+            patch({ txTime: text });
+            if (showTimeHint) setShowTimeHint(false);
+          }}
+          placeholder="2026-09-18 12:30"
+          placeholderTextColor={Colors.subText}
+          autoCapitalize="none"
+        />
+        <Pressable
+          hitSlop={8}
+          style={styles.timeButton}
+          onPress={() => setPickerMode('date')}>
+          <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
+        </Pressable>
+      </View>
       {showTimeHint ? (
         <Text style={styles.fieldHint}>未识别到时间，已按现在填写，请确认或修改。</Text>
+      ) : null}
+      {pickerMode ? (
+        <DateTimePicker
+          value={currentPickerDate()}
+          mode={pickerMode}
+          is24Hour
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={pickerMode === 'date' ? handleDateChange : handleTimeChange}
+        />
       ) : null}
 
       <Text style={styles.label}>备注</Text>
@@ -340,6 +399,22 @@ const styles = StyleSheet.create({
   },
   directionTextSelected: {
     fontWeight: '600',
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  timeInput: {
+    flex: 1,
+  },
+  timeButton: {
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
   },
   input: {
     backgroundColor: Colors.card,

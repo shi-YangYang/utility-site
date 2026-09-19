@@ -34,7 +34,8 @@
       "expo-sqlite",
       "expo-font",
       "expo-sharing",
-      "./plugins/with-release-build.js"
+      "./plugins/with-release-build.js",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
