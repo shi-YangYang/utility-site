@@ -1,14 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { categoryColor, Colors, Radius, Spacing } from '@/constants/theme';
-import { listRecordsByMonth } from '@/db/records';
+import { listRecords, listRecordsByMonth } from '@/db/records';
 import { monthKeyOf, monthLabel, shiftMonth } from '@/lib/dates';
+import { canShare, shareBase64File } from '@/lib/export';
 import { formatCents } from '@/lib/money';
 import { formatRatio, summarize } from '@/lib/summary';
 import type { LedgerRecord } from '@/lib/types';
+import { buildWorkbookBase64, exportFileName, XLSX_MIME } from '@/lib/xlsx';
 
 export default function SummaryScreen() {
   const [monthKey, setMonthKey] = useState(() => monthKeyOf(new Date()));
@@ -35,6 +37,35 @@ export default function SummaryScreen() {
   const summary = summarize(records);
   const currentMonthKey = monthKeyOf(new Date());
   const isCurrentMonth = monthKey === currentMonthKey;
+
+  async function exportRecords(scope: 'month' | 'all') {
+    try {
+      const rows = scope === 'month' ? records : await listRecords();
+      if (rows.length === 0) {
+        Alert.alert('没有可导出的记录', scope === 'month' ? '本月还没有记录。' : '账本还是空的。');
+        return;
+      }
+      if (!(await canShare())) {
+        Alert.alert('无法导出', '当前设备不支持系统分享。');
+        return;
+      }
+      await shareBase64File(
+        buildWorkbookBase64(rows),
+        exportFileName(scope === 'month' ? monthKey : null, new Date()),
+        XLSX_MIME,
+      );
+    } catch {
+      Alert.alert('导出失败', '请重试。');
+    }
+  }
+
+  function handleExport() {
+    Alert.alert('导出 Excel', '选择导出范围', [
+      { text: '仅本月', onPress: () => void exportRecords('month') },
+      { text: '全部记录', onPress: () => void exportRecords('all') },
+      { text: '取消', style: 'cancel' },
+    ]);
+  }
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
@@ -99,6 +130,11 @@ export default function SummaryScreen() {
           ))}
         </View>
       )}
+
+      <Pressable style={styles.exportButton} onPress={handleExport}>
+        <Ionicons name="share-outline" size={16} color={Colors.primary} />
+        <Text style={styles.exportText}>导出 Excel</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -158,6 +194,21 @@ const styles = StyleSheet.create({
   countLabel: {
     fontSize: 13,
     color: Colors.subText,
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    paddingVertical: 12,
+  },
+  exportText: {
+    color: Colors.primary,
+    fontSize: 15,
   },
   sectionTitle: {
     fontSize: 14,

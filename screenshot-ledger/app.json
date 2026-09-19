@@ -32,7 +32,8 @@
         }
       ],
       "expo-sqlite",
-      "expo-font"
+      "expo-font",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
