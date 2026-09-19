@@ -1,11 +1,12 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
 
 export default function RootLayout() {
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -20,6 +21,6 @@ export default function RootLayout() {
         <Stack.Screen name="manual" options={{ title: '手动记一笔' }} />
         <Stack.Screen name="record/[id]" options={{ title: '记录详情' }} />
       </Stack>
-    </>
+    </SafeAreaProvider>
   );
 }

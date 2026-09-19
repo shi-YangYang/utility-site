@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RecordForm } from '@/components/record-form';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -19,6 +20,7 @@ export default function RecordDetailScreen() {
   const recordId = Number(params.id);
   const [record, setRecord] = useState<LedgerRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let alive = true;
@@ -95,7 +97,9 @@ export default function RecordDetailScreen() {
         submitLabel="保存修改"
         onSubmit={handleSave}
       />
-      <Pressable style={styles.deleteButton} onPress={confirmDelete}>
+      <Pressable
+        style={[styles.deleteButton, { marginBottom: Spacing.lg + insets.bottom }]}
+        onPress={confirmDelete}>
         <Text style={styles.deleteText}>删除这条记录</Text>
       </Pressable>
     </View>

@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ImagePickerAsset } from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DraftCard } from '@/components/draft-card';
 import { ProgressBar } from '@/components/progress-bar';
@@ -70,6 +71,7 @@ export default function AddScreen() {
   const [savedCount, setSavedCount] = useState(0);
   const [saveTotal, setSaveTotal] = useState(0);
   const configRef = useRef<LlmConfig | null>(null);
+  const insets = useSafeAreaInsets();
 
   const total = steps.length;
   const readyCount = steps.filter(isSavable).length;
@@ -413,7 +415,7 @@ export default function AddScreen() {
           );
         })}
       </ScrollView>
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: Spacing.md + insets.bottom }]}>
         {ignoredCount > 0 ? (
           <Text style={styles.ignoredText}>已忽略 {ignoredCount} 张</Text>
         ) : null}

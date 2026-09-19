@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { CATEGORIES, PAY_METHODS, PLATFORMS } from '@/lib/categories';
@@ -41,6 +42,7 @@ export function RecordForm({
   const [values, setValues] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [showTimeHint, setShowTimeHint] = useState(timeInferred);
+  const insets = useSafeAreaInsets();
 
   function patch(changes: Partial<RecordFormValues>) {
     setValues((prev) => ({ ...prev, ...changes }));
@@ -59,7 +61,10 @@ export function RecordForm({
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: Spacing.xl * 2 + insets.bottom },
+      ]}
       keyboardShouldPersistTaps="handled">
       {imageUri ? (
         <Image source={{ uri: imageUri }} style={styles.preview} contentFit="cover" />
