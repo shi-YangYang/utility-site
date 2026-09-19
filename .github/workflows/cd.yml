@@ -1,6 +1,9 @@
 # CD：合并到 main 后执行，按改动目录通过 SSH 部署到服务器。
-# 没有 docker-compose.yml / compose.yml 的子项目（如 App 类）会自动跳过，不视为失败。
+# 只监听"可部署单元"路径（on.push.paths），App 类子项目的改动不会触发本工作流；
+# 即使被触发，没有 docker-compose.yml / compose.yml 的子项目也会被跳过，不视为失败。
 #
+# - 新增需要服务器部署的子项目时：在下面 on.push.paths 加一行它的目录，
+#   并在 deploy/ports.md 登记端口（说明见 deploy/README.md）；
 # - 服务器凭据（SSH_HOST / SSH_USER / SSH_KEY）未配置时跳过并提示，不失败；
 # - 还需要仓库变量 DEPLOY_PATH（服务器上仓库的绝对路径）；
 # - 手动补部署：Actions 里手动运行本工作流，填 project（如 recording / proxy / all）。
@@ -13,6 +16,9 @@ name: CD
 on:
   push:
     branches: [main]
+    paths:
+      - 'recording/**'
+      - 'deploy/**'
   workflow_dispatch:
     inputs:
       project:
