@@ -67,8 +67,8 @@ cp Caddyfile.example Caddyfile
 
 | 文件 | 触发 | 做什么 |
 |---|---|---|
-| `ci.yml` | PR 到 `main` | 只校验本次改动到的子项目：`deploy` 做 shell/compose 校验；`recording` 做 `node --check`、compose 校验与镜像构建；不做全量重验 |
-| `cd.yml` | 合并到 `main`（或手动运行） | 按改动目录 SSH 部署对应子项目；`deploy/` 变化 → `all`；纯 `.github/` 变化 → 不部署 |
+| `ci.yml` | PR 到 `main` | 只校验本次改动到的子项目：`deploy` 做 shell/compose 校验；`recording` 做 `node --check`、compose 校验与镜像构建；`screenshot-ledger` 做 `tsc` 与 Jest 单测；不做全量重验 |
+| `cd.yml` | **只在手动触发时运行**（Actions → CD → Run workflow） | 从下拉里选择目标（`recording` / `proxy` / `all`），交给 `deploy/scripts/deploy.sh` 执行；**合并到 `main` 不会自动部署**；未配置凭据时跳过并提示。**新增可部署子项目时，把项目名加进 `cd.yml` 的 `inputs.project.options`** |
 
 **使用前需要在 GitHub 配置**（Settings → Secrets and variables → Actions）：
 
@@ -86,8 +86,8 @@ cp Caddyfile.example Caddyfile
 - 已安装 Docker 与 compose 插件；
 - 首次部署前按 [`ports.md`](./ports.md) 确认端口未被占用。
 
-未配置凭据时，CD 会跳过部署并在 Actions 里给出提示，不会失败。
-手动补部署：Actions → CD → Run workflow → 填目标（如 `recording` / `proxy` / `all`）。
+未配置凭据时，运行 CD 会跳过部署并在 Actions 里给出提示，不会失败。
+部署方式：Actions → CD → Run workflow → 选择目标（如 `recording` / `proxy` / `all`）。
 
 ## 多个子项目并存（端口区分）
 

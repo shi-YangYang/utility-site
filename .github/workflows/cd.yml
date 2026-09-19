@@ -1,8 +1,12 @@
-# CD：合并到 main 后执行，按改动目录通过 SSH 部署到服务器。
+# CD：只在手动触发时执行（Actions → CD → Run workflow），合并到 main 不会自动部署。
+#
+# 规则（用户 2026-09-19 定）：只有明确需要部署时才运行本工作流，从下拉选择目标，
+# 原样交给 deploy/scripts/deploy.sh 执行；目标没有 compose 文件时脚本会明确报错。
+# 新增可部署子项目时：在该项目里自备 Dockerfile/compose、登记 deploy/ports.md，
+# 并把项目名加进下面 inputs.project.options（需要走 HTTPS 的还要改 deploy/proxy 并部署 proxy）。
 #
 # - 服务器凭据（SSH_HOST / SSH_USER / SSH_KEY）未配置时跳过并提示，不失败；
-# - 还需要仓库变量 DEPLOY_PATH（服务器上仓库的绝对路径）；
-# - 手动补部署：Actions 里手动运行本工作流，填 project（如 recording / proxy / all）。
+# - 还需要仓库变量 DEPLOY_PATH（服务器上仓库的绝对路径）。
 #
 # 约定见根 AGENTS.md 5.2 / 5.3；服务器准备与凭据配置见 deploy/README.md。
 # 本文件位于仓库根 .github/，是经用户批准的唯一根目录结构例外（AGENTS.md 21.2）。
@@ -10,57 +14,29 @@
 name: CD
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       project:
-        description: "要部署的目标（子项目名 / proxy / all）"
+        description: "选择要部署的目标"
         required: true
-        default: "recording"
+        type: choice
+        default: recording
+        options:
+          - recording
+          - proxy
+          - all
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-main
+  group: deploy-manual
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: 检出代码（diff 需要完整历史）
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 确定部署目标
-        id: targets
-        run: |
-          set -eu
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            targets="${{ inputs.project }}"
-          else
-            before="${{ github.event.before }}"
-            if [ "$before" = "0000000000000000000000000000000000000000" ]; then
-              changed=""
-            else
-              changed=$(git diff --name-only "$before...HEAD" | awk -F/ 'NF > 1 { print $1 }' | sort -u)
-            fi
-            targets=""
-            for p in $changed; do
-              case "$p" in
-                deploy) targets="$targets all" ;;
-                .github) : ;; # 仅流水线自身变化，不影响运行中的服务
-                *) targets="$targets $p" ;;
-              esac
-            done
-          fi
-          targets=$(printf '%s\n' $targets | sort -u | tr '\n' ' ')
-          echo "targets=$targets" >> "$GITHUB_OUTPUT"
-          echo "部署目标：${targets:-（无）}"
-
       - name: 检查服务器凭据是否已配置
         id: creds
         env:
@@ -76,13 +52,13 @@ jobs:
           fi
 
       - name: SSH 部署到服务器
-        if: steps.creds.outputs.ready == 'true' && steps.targets.outputs.targets != ''
+        if: steps.creds.outputs.ready == 'true'
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_KEY: ${{ secrets.SSH_KEY }}
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-          TARGETS: ${{ steps.targets.outputs.targets }}
+          TARGET: ${{ inputs.project }}
         run: |
           set -eu
           if [ -z "${DEPLOY_PATH:-}" ]; then
@@ -93,9 +69,7 @@ jobs:
           chmod 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          for t in $TARGETS; do
-            echo "==> 部署 $t"
-            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
-              "$SSH_USER@$SSH_HOST" \
-              "cd '$DEPLOY_PATH' && git pull --ff-only && ./deploy/scripts/deploy.sh $t"
-          done
+          echo "==> 部署 $TARGET"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            "$SSH_USER@$SSH_HOST" \
+            "cd '$DEPLOY_PATH' && git pull --ff-only && ./deploy/scripts/deploy.sh $TARGET"

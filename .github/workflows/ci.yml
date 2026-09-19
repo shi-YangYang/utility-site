@@ -54,3 +54,18 @@ jobs:
       - name: 构建 recording 镜像（可部署单元）
         if: contains(steps.changed.outputs.projects, 'recording')
         run: docker build -t recording:ci recording/
+
+      - name: 准备 Node（screenshot-ledger 校验用）
+        if: contains(steps.changed.outputs.projects, 'screenshot-ledger')
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 校验 screenshot-ledger（类型检查 + 单元测试）
+        if: contains(steps.changed.outputs.projects, 'screenshot-ledger')
+        working-directory: screenshot-ledger
+        run: |
+          set -eu
+          npm ci
+          npx tsc --noEmit
+          npm test -- --ci
