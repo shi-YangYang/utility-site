@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 
+import { exportBaseName } from './export-names';
 import type { LedgerRecord } from './types';
 
 export const XLSX_MIME =
@@ -35,8 +36,5 @@ export function buildWorkbookBase64(records: LedgerRecord[]): string {
 }
 
 export function exportFileName(monthKey: string | null, today: Date): string {
-  if (monthKey) return `截图记账-${monthKey}.xlsx`;
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `截图记账-全部-${today.getFullYear()}-${month}-${day}.xlsx`;
+  return `${exportBaseName(monthKey, today)}.xlsx`;
 }
