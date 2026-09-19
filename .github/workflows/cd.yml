@@ -1,8 +1,9 @@
 # CD：只在手动触发时执行（Actions → CD → Run workflow），合并到 main 不会自动部署。
 #
-# 规则（用户 2026-09-19 定）：只有明确需要部署时才运行本工作流，目标可选
-# 子项目名 / proxy / all，原样交给 deploy/scripts/deploy.sh 执行；
-# 目标没有 docker-compose.yml / compose.yml 时脚本会明确报错。
+# 规则（用户 2026-09-19 定）：只有明确需要部署时才运行本工作流，从下拉选择目标，
+# 原样交给 deploy/scripts/deploy.sh 执行；目标没有 compose 文件时脚本会明确报错。
+# 新增可部署子项目时：在该项目里自备 Dockerfile/compose、登记 deploy/ports.md，
+# 并把项目名加进下面 inputs.project.options（需要走 HTTPS 的还要改 deploy/proxy 并部署 proxy）。
 #
 # - 服务器凭据（SSH_HOST / SSH_USER / SSH_KEY）未配置时跳过并提示，不失败；
 # - 还需要仓库变量 DEPLOY_PATH（服务器上仓库的绝对路径）。
@@ -16,9 +17,14 @@ on:
   workflow_dispatch:
     inputs:
       project:
-        description: "要部署的目标（子项目名 / proxy / all）"
+        description: "选择要部署的目标"
         required: true
-        default: "recording"
+        type: choice
+        default: recording
+        options:
+          - recording
+          - proxy
+          - all
 
 permissions:
   contents: read

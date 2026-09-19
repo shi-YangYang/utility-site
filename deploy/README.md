@@ -68,7 +68,7 @@ cp Caddyfile.example Caddyfile
 | 文件 | 触发 | 做什么 |
 |---|---|---|
 | `ci.yml` | PR 到 `main` | 只校验本次改动到的子项目：`deploy` 做 shell/compose 校验；`recording` 做 `node --check`、compose 校验与镜像构建；`screenshot-ledger` 做 `tsc` 与 Jest 单测；不做全量重验 |
-| `cd.yml` | **只在手动触发时运行**（Actions → CD → Run workflow） | 按填写的目标（子项目名 / `proxy` / `all`）交给 `deploy/scripts/deploy.sh` 执行；**合并到 `main` 不会自动部署**；未配置凭据时跳过并提示 |
+| `cd.yml` | **只在手动触发时运行**（Actions → CD → Run workflow） | 从下拉里选择目标（`recording` / `proxy` / `all`），交给 `deploy/scripts/deploy.sh` 执行；**合并到 `main` 不会自动部署**；未配置凭据时跳过并提示。**新增可部署子项目时，把项目名加进 `cd.yml` 的 `inputs.project.options`** |
 
 **使用前需要在 GitHub 配置**（Settings → Secrets and variables → Actions）：
 
