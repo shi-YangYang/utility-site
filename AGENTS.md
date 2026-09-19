@@ -967,6 +967,7 @@ workflow_tier: LIGHT
 |---|---|---|---|
 | [recording](./recording/) | FULL | 公司内部的语音样本采集：员工录中英文两段音频上传，管理员查看提交情况 | MVP 已完成 |
 | [deploy](./deploy/) | LIGHT | 全站部署与运维：反向代理、端口分配表、部署脚本与 CI/CD（非业务工具） | 骨架 + 流水线已就位 |
+| [screenshot-ledger](./screenshot-ledger/) | LIGHT（用户明确指定，按 6.1 判据本应为 FULL） | Android 截图记账 App：导入京东/淘宝/拼多多等付款截图，LLM 识别后一键记账、按月汇总 | MVP 代码完成；自动化验证通过，待真机冒烟与 APK 构建 |
 
 ## 全站待定
 
