@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="add" options={{ title: '截图记账' }} />
         <Stack.Screen name="manual" options={{ title: '手动记一笔' }} />
         <Stack.Screen name="categories" options={{ title: '分类管理' }} />
+        <Stack.Screen name="platforms" options={{ title: '平台管理' }} />
         <Stack.Screen name="export" options={{ title: '导出账目' }} />
         <Stack.Screen name="record/[id]" options={{ title: '记录详情' }} />
       </Stack>

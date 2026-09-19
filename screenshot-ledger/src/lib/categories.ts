@@ -10,14 +10,14 @@ export const DEFAULT_CATEGORIES = [
   '其他',
 ] as const;
 
+export const DEFAULT_PLATFORMS = ['京东', '淘宝', '拼多多', '微信', '支付宝', '其他'] as const;
+
 export const DEFAULT_CATEGORY = '其他';
-export const MAX_CATEGORY_LENGTH = 8;
+export const MAX_OPTION_LENGTH = 8;
 
-export const PLATFORMS = ['京东', '淘宝', '拼多多', '微信', '支付宝', '其他'] as const;
-
-export function normalizeCategoryName(input: string): string | null {
+export function normalizeOptionName(input: string): string | null {
   const name = input.trim();
   if (!name) return null;
-  if ([...name].length > MAX_CATEGORY_LENGTH) return null;
+  if ([...name].length > MAX_OPTION_LENGTH) return null;
   return name;
 }

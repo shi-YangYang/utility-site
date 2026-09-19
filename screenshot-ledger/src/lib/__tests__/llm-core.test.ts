@@ -38,9 +38,10 @@ describe('extractJsonBlock', () => {
 });
 
 describe('buildSystemPrompt', () => {
-  it('把当前分类列表写进提示词', () => {
-    const prompt = buildSystemPrompt(['餐饮', '宠物']);
+  it('把当前分类与平台列表写进提示词', () => {
+    const prompt = buildSystemPrompt(['餐饮', '宠物'], ['京东', '山姆']);
     expect(prompt).toContain('餐饮、宠物');
+    expect(prompt).toContain('京东、山姆');
     expect(prompt).not.toContain('支付方式');
   });
 });
@@ -65,10 +66,14 @@ describe('buildChatRequest', () => {
     expect(body.messages[0].content).toContain(STRICT_RETRY_SUFFIX);
   });
 
-  it('使用自定义分类列表', () => {
-    const request = buildChatRequest(CONFIG, 'X', { categories: ['餐饮', '宠物'] });
+  it('使用自定义分类与平台列表', () => {
+    const request = buildChatRequest(CONFIG, 'X', {
+      categories: ['餐饮', '宠物'],
+      platforms: ['京东', '山姆'],
+    });
     const body = JSON.parse(request.body);
     expect(body.messages[0].content).toContain('餐饮、宠物');
+    expect(body.messages[0].content).toContain('京东、山姆');
   });
 
   it('阿里云百炼地址关闭思考模式，其他服务商不加该参数', () => {
@@ -99,12 +104,13 @@ describe('parseExtraction', () => {
     });
   });
 
-  it('识别自定义分类', () => {
-    const extraction = parseExtraction('{"amount": "1.00", "category": "宠物"}', [
-      '餐饮',
-      '宠物',
-    ]);
+  it('识别自定义分类与平台', () => {
+    const extraction = parseExtraction(
+      '{"amount": "1.00", "category": "宠物", "platform": "山姆"}',
+      { categories: ['餐饮', '宠物'], platforms: ['京东', '山姆'] },
+    );
     expect(extraction.category).toBe('宠物');
+    expect(extraction.platform).toBe('山姆');
   });
 
   it('无法解析时抛 ParseError', () => {
@@ -145,8 +151,11 @@ describe('normalizeRaw', () => {
     expect(extraction.category).toBe('其他');
   });
 
-  it('平台不在列表内时置空', () => {
+  it('平台不在列表内时置空，自定义平台可被接受', () => {
     expect(normalizeRaw({ amount: '1.00', platform: '某宝' }).platform).toBeNull();
+    expect(
+      normalizeRaw({ amount: '1.00', platform: '山姆' }, { platforms: ['京东', '山姆'] }).platform,
+    ).toBe('山姆');
   });
 
   it('金额缺失时 is_payment 默认 false', () => {

@@ -1,8 +1,8 @@
 import {
   DEFAULT_CATEGORIES,
   DEFAULT_CATEGORY,
-  MAX_CATEGORY_LENGTH,
-  normalizeCategoryName,
+  MAX_OPTION_LENGTH,
+  normalizeOptionName,
 } from '@/lib/categories';
 
 import { getDb } from './db';
@@ -19,8 +19,8 @@ export async function listCategories(): Promise<string[]> {
 export async function addCategory(
   input: string,
 ): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
-  const name = normalizeCategoryName(input);
-  if (!name) return { ok: false, error: `名称需要 1-${MAX_CATEGORY_LENGTH} 个字符` };
+  const name = normalizeOptionName(input);
+  if (!name) return { ok: false, error: `名称需要 1-${MAX_OPTION_LENGTH} 个字符` };
   const db = await getDb();
   const existing = await db.getFirstAsync<{ name: string }>(
     'SELECT name FROM categories WHERE name = ?',

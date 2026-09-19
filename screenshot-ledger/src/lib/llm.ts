@@ -46,6 +46,7 @@ export interface RecognizeDeps {
   fetchImpl?: FetchLike;
   timeoutMs?: number;
   categories?: readonly string[];
+  platforms?: readonly string[];
 }
 
 const DEFAULT_TIMEOUT_MS = 60000;
@@ -164,11 +165,13 @@ export async function recognizeImage(
   const options: ChatRequestOptions = {
     strict: false,
     categories: deps.categories,
+    platforms: deps.platforms,
   };
+  const parseOptions = { categories: deps.categories, platforms: deps.platforms };
 
   const first = await callOnce(fetchImpl, config, imageBase64, options, timeoutMs);
   try {
-    return parseExtraction(first, deps.categories);
+    return parseExtraction(first, parseOptions);
   } catch (error) {
     if (!(error instanceof ParseError)) throw error;
     const second = await callOnce(
@@ -179,7 +182,7 @@ export async function recognizeImage(
       timeoutMs,
     );
     try {
-      return parseExtraction(second, deps.categories);
+      return parseExtraction(second, parseOptions);
     } catch (retryError) {
       if (retryError instanceof ParseError) throw new LlmError('parse', retryError.message);
       throw retryError;

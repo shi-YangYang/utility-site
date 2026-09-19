@@ -12,6 +12,7 @@ import { RecordForm } from '@/components/record-form';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { countRecordsWithImageHash, insertRecord } from '@/db/records';
 import { listCategories } from '@/db/categories';
+import { listPlatforms } from '@/db/platforms';
 import { getLlmConfig, MISSING_CONFIG_MESSAGE } from '@/lib/config';
 import {
   emptyFormValues,
@@ -101,8 +102,14 @@ export default function AddScreen() {
     }
     patchStep(target, { prepared, status: 'recognizing' });
     try {
-      const categories = await listCategories();
-      const extraction = await recognizeImage(prepared.base64, config, { categories });
+      const [categories, platforms] = await Promise.all([
+        listCategories(),
+        listPlatforms(),
+      ]);
+      const extraction = await recognizeImage(prepared.base64, config, {
+        categories,
+        platforms,
+      });
       const duplicate =
         extraction.isPayment && (await countRecordsWithImageHash(prepared.hash)) > 0;
       patchStep(target, {

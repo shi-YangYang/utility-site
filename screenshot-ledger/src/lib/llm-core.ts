@@ -1,4 +1,4 @@
-import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY, PLATFORMS } from './categories';
+import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY, DEFAULT_PLATFORMS } from './categories';
 import { normalizeTxTime } from './dates';
 import { parseAmountToCents } from './money';
 import type { Confidence, Direction, LlmConfig, LlmExtraction } from './types';
@@ -12,7 +12,10 @@ export class ParseError extends Error {
   }
 }
 
-export function buildSystemPrompt(categories: readonly string[] = DEFAULT_CATEGORIES): string {
+export function buildSystemPrompt(
+  categories: readonly string[] = DEFAULT_CATEGORIES,
+  platforms: readonly string[] = DEFAULT_PLATFORMS,
+): string {
   return [
     '你是一个记账助手。用户会给你一张手机截图，通常来自京东、淘宝、拼多多、微信或支付宝，内容是付款、转账或收款的凭证。',
     '请从中提取记账所需信息，并且只输出一个 JSON 对象，不要输出任何其他文字，不要使用 Markdown 代码块。',
@@ -24,7 +27,7 @@ export function buildSystemPrompt(categories: readonly string[] = DEFAULT_CATEGO
     '  "direction": "expense",             // expense=支出（付款），income=收入（收款、退款到账）',
     '  "merchant": "商户名或收款方",        // 识别不到用 null',
     `  "category": "分类",                  // 必须从以下列表选一个：${categories.join('、')}`,
-    `  "platform": "平台",                  // 从以下列表选一个或 null：${PLATFORMS.join('、')}`,
+    `  "platform": "平台",                  // 从以下列表选一个或 null：${platforms.join('、')}`,
     '  "tx_time": "2026-09-18 12:30",     // 交易时间，格式 YYYY-MM-DD HH:mm；识别不到用 null',
     '  "note": "订单号或商品摘要",          // 可空',
     '  "confidence": "high"                // 对识别结果的把握：high / medium / low',
@@ -40,6 +43,7 @@ export const STRICT_RETRY_SUFFIX =
 export interface ChatRequestOptions {
   strict?: boolean;
   categories?: readonly string[];
+  platforms?: readonly string[];
 }
 
 export function buildChatRequest(
@@ -48,7 +52,7 @@ export function buildChatRequest(
   options: ChatRequestOptions = {},
 ): { url: string; headers: Record<string, string>; body: string } {
   const url = `${config.baseUrl.replace(/\/+$/, '')}/chat/completions`;
-  const basePrompt = buildSystemPrompt(options.categories);
+  const basePrompt = buildSystemPrompt(options.categories, options.platforms);
   const systemPrompt = options.strict ? `${basePrompt}${STRICT_RETRY_SUFFIX}` : basePrompt;
   const body: Record<string, unknown> = {
     model: config.model,
@@ -104,10 +108,7 @@ export function extractJsonBlock(content: string): string | null {
   return null;
 }
 
-export function parseExtraction(
-  content: string,
-  categories: readonly string[] = DEFAULT_CATEGORIES,
-): LlmExtraction {
+export function parseExtraction(content: string, options: ParseOptions = {}): LlmExtraction {
   const jsonText = extractJsonBlock(content);
   if (!jsonText) throw new ParseError('模型回复中没有 JSON');
   let raw: unknown;
@@ -116,7 +117,7 @@ export function parseExtraction(
   } catch {
     throw new ParseError('模型回复不是合法 JSON');
   }
-  return normalizeRaw(raw, categories);
+  return normalizeRaw(raw, options);
 }
 
 function asString(value: unknown): string | null {
@@ -164,10 +165,14 @@ function truncate(value: string | null, max: number): string | null {
   return value.length > max ? value.slice(0, max) : value;
 }
 
-export function normalizeRaw(
-  raw: unknown,
-  categories: readonly string[] = DEFAULT_CATEGORIES,
-): LlmExtraction {
+export interface ParseOptions {
+  categories?: readonly string[];
+  platforms?: readonly string[];
+}
+
+export function normalizeRaw(raw: unknown, options: ParseOptions = {}): LlmExtraction {
+  const categories = options.categories ?? DEFAULT_CATEGORIES;
+  const platforms = options.platforms ?? DEFAULT_PLATFORMS;
   const source = (raw ?? {}) as Record<string, unknown>;
   const amountText = asString(source.amount);
   const amountCents = amountText ? parseAmountToCents(amountText) : null;
@@ -181,7 +186,7 @@ export function normalizeRaw(
     merchant: truncate(asString(source.merchant), 60),
     category:
       categoryText && categories.includes(categoryText) ? categoryText : DEFAULT_CATEGORY,
-    platform: pickOption(asString(source.platform), PLATFORMS),
+    platform: pickOption(asString(source.platform), platforms),
     txTime: (() => {
       const text = asString(source.tx_time);
       return text ? normalizeTxTime(text) : null;

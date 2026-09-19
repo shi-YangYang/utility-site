@@ -15,7 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { listCategories } from '@/db/categories';
-import { DEFAULT_CATEGORIES, PLATFORMS } from '@/lib/categories';
+import { listPlatforms } from '@/db/platforms';
+import { DEFAULT_CATEGORIES, DEFAULT_PLATFORMS } from '@/lib/categories';
 import { validateFormValues, type RecordFormValues, type ValidatedForm } from '@/lib/form';
 import type { Direction } from '@/lib/types';
 
@@ -46,14 +47,22 @@ export function RecordForm({
   const [error, setError] = useState<string | null>(null);
   const [showTimeHint, setShowTimeHint] = useState(timeInferred);
   const [categories, setCategories] = useState<string[]>([...DEFAULT_CATEGORIES]);
+  const [platforms, setPlatforms] = useState<string[]>([...DEFAULT_PLATFORMS]);
+  const [previewRatio, setPreviewRatio] = useState<number | null>(null);
   const insets = useSafeAreaInsets();
 
   useFocusEffect(
     useCallback(() => {
       let alive = true;
       void (async () => {
-        const list = await listCategories();
-        if (alive) setCategories(list);
+        const [categoryList, platformList] = await Promise.all([
+          listCategories(),
+          listPlatforms(),
+        ]);
+        if (alive) {
+          setCategories(categoryList);
+          setPlatforms(platformList);
+        }
       })();
       return () => {
         alive = false;
@@ -65,6 +74,10 @@ export function RecordForm({
     values.category && !categories.includes(values.category)
       ? [...categories, values.category]
       : categories;
+  const platformOptions =
+    values.platform && !platforms.includes(values.platform)
+      ? [...platforms, values.platform]
+      : platforms;
 
   function patch(changes: Partial<RecordFormValues>) {
     setValues((prev) => ({ ...prev, ...changes }));
@@ -89,7 +102,19 @@ export function RecordForm({
       ]}
       keyboardShouldPersistTaps="handled">
       {imageUri ? (
-        <Image source={{ uri: imageUri }} style={styles.preview} contentFit="cover" />
+        <Image
+          source={{ uri: imageUri }}
+          style={
+            previewRatio == null
+              ? styles.previewFallback
+              : [styles.preview, { aspectRatio: previewRatio }]
+          }
+          contentFit="contain"
+          onLoad={(event) => {
+            const { width, height } = event.source;
+            if (width && height) setPreviewRatio(width / height);
+          }}
+        />
       ) : null}
 
       {duplicateHint ? (
@@ -158,9 +183,14 @@ export function RecordForm({
         onChange={(category) => patch({ category })}
       />
 
-      <Text style={styles.label}>平台</Text>
+      <View style={styles.labelRow}>
+        <Text style={styles.label}>平台</Text>
+        <Pressable hitSlop={8} onPress={() => router.push('/platforms')}>
+          <Text style={styles.labelAction}>管理</Text>
+        </Pressable>
+      </View>
       <ChipGroup
-        options={PLATFORMS}
+        options={platformOptions}
         value={values.platform}
         onChange={(platform) => patch({ platform })}
         allowClear
@@ -224,6 +254,12 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xl * 2,
   },
   preview: {
+    width: '100%',
+    borderRadius: Radius.md,
+    marginBottom: Spacing.lg,
+    backgroundColor: Colors.border,
+  },
+  previewFallback: {
     width: '100%',
     height: 220,
     borderRadius: Radius.md,
