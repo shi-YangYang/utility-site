@@ -11,6 +11,7 @@ import { ProgressBar } from '@/components/progress-bar';
 import { RecordForm } from '@/components/record-form';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { countRecordsWithImageHash, insertRecord } from '@/db/records';
+import { listCategories } from '@/db/categories';
 import { getLlmConfig, MISSING_CONFIG_MESSAGE } from '@/lib/config';
 import {
   emptyFormValues,
@@ -100,7 +101,8 @@ export default function AddScreen() {
     }
     patchStep(target, { prepared, status: 'recognizing' });
     try {
-      const extraction = await recognizeImage(prepared.base64, config);
+      const categories = await listCategories();
+      const extraction = await recognizeImage(prepared.base64, config, { categories });
       const duplicate =
         extraction.isPayment && (await countRecordsWithImageHash(prepared.hash)) > 0;
       patchStep(target, {
@@ -389,7 +391,7 @@ export default function AddScreen() {
               subtitle={
                 step.error ??
                 (values
-                  ? [values.txTime, values.category, values.payMethod]
+                  ? [values.txTime, values.category, values.platform]
                       .filter(Boolean)
                       .join(' · ')
                   : '待处理')

@@ -2,6 +2,7 @@ import {
   buildChatRequest,
   ParseError,
   parseExtraction,
+  type ChatRequestOptions,
   type LlmExtraction,
 } from './llm-core';
 import type { LlmConfig } from './types';
@@ -44,6 +45,7 @@ export type FetchLike = (url: string, init: FetchInitLike) => Promise<FetchRespo
 export interface RecognizeDeps {
   fetchImpl?: FetchLike;
   timeoutMs?: number;
+  categories?: readonly string[];
 }
 
 const DEFAULT_TIMEOUT_MS = 60000;
@@ -96,12 +98,11 @@ async function callOnce(
   fetchImpl: FetchLike,
   config: LlmConfig,
   imageBase64: string,
-  strict: boolean,
+  options: ChatRequestOptions,
   timeoutMs: number,
 ): Promise<string> {
-  const request = buildChatRequest(config, imageBase64, strict);
-  const controller =
-    typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const request = buildChatRequest(config, imageBase64, options);
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -160,15 +161,25 @@ export async function recognizeImage(
     deps.fetchImpl ?? ((globalThis as { fetch?: unknown }).fetch as FetchLike | undefined);
   if (!fetchImpl) throw new LlmError('config', '当前环境不支持网络请求');
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const options: ChatRequestOptions = {
+    strict: false,
+    categories: deps.categories,
+  };
 
-  const first = await callOnce(fetchImpl, config, imageBase64, false, timeoutMs);
+  const first = await callOnce(fetchImpl, config, imageBase64, options, timeoutMs);
   try {
-    return parseExtraction(first);
+    return parseExtraction(first, deps.categories);
   } catch (error) {
     if (!(error instanceof ParseError)) throw error;
-    const second = await callOnce(fetchImpl, config, imageBase64, true, timeoutMs);
+    const second = await callOnce(
+      fetchImpl,
+      config,
+      imageBase64,
+      { ...options, strict: true },
+      timeoutMs,
+    );
     try {
-      return parseExtraction(second);
+      return parseExtraction(second, deps.categories);
     } catch (retryError) {
       if (retryError instanceof ParseError) throw new LlmError('parse', retryError.message);
       throw retryError;

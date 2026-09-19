@@ -9,7 +9,6 @@ interface RecordRow {
   direction: string;
   merchant: string | null;
   category: string;
-  pay_method: string | null;
   platform: string | null;
   tx_time: string;
   note: string | null;
@@ -26,7 +25,6 @@ function toRecord(row: RecordRow): LedgerRecord {
     direction: row.direction === 'income' ? 'income' : 'expense',
     merchant: row.merchant,
     category: row.category,
-    payMethod: row.pay_method,
     platform: row.platform,
     txTime: row.tx_time,
     note: row.note,
@@ -42,13 +40,12 @@ export async function insertRecord(draft: RecordDraft): Promise<number> {
   const now = new Date().toISOString();
   const result = await db.runAsync(
     `INSERT INTO records
-      (amount_cents, direction, merchant, category, pay_method, platform, tx_time, note, image_path, image_hash, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (amount_cents, direction, merchant, category, platform, tx_time, note, image_path, image_hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     draft.amountCents,
     draft.direction,
     draft.merchant,
     draft.category,
-    draft.payMethod,
     draft.platform,
     draft.txTime,
     draft.note,
@@ -64,14 +61,13 @@ export async function updateRecord(id: number, draft: RecordDraft): Promise<void
   const db = await getDb();
   await db.runAsync(
     `UPDATE records SET
-      amount_cents = ?, direction = ?, merchant = ?, category = ?, pay_method = ?,
-      platform = ?, tx_time = ?, note = ?, updated_at = ?
+      amount_cents = ?, direction = ?, merchant = ?, category = ?, platform = ?,
+      tx_time = ?, note = ?, updated_at = ?
      WHERE id = ?`,
     draft.amountCents,
     draft.direction,
     draft.merchant,
     draft.category,
-    draft.payMethod,
     draft.platform,
     draft.txTime,
     draft.note,

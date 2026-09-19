@@ -1,4 +1,5 @@
 import {
+  buildSystemPrompt,
   buildChatRequest,
   extractJsonBlock,
   normalizeRaw,
@@ -36,6 +37,14 @@ describe('extractJsonBlock', () => {
   });
 });
 
+describe('buildSystemPrompt', () => {
+  it('把当前分类列表写进提示词', () => {
+    const prompt = buildSystemPrompt(['餐饮', '宠物']);
+    expect(prompt).toContain('餐饮、宠物');
+    expect(prompt).not.toContain('支付方式');
+  });
+});
+
 describe('buildChatRequest', () => {
   it('拼接 URL、鉴权头与请求体', () => {
     const request = buildChatRequest(CONFIG, 'BASE64DATA');
@@ -51,9 +60,15 @@ describe('buildChatRequest', () => {
   });
 
   it('strict 模式追加更严格的指令', () => {
-    const request = buildChatRequest(CONFIG, 'X', true);
+    const request = buildChatRequest(CONFIG, 'X', { strict: true });
     const body = JSON.parse(request.body);
     expect(body.messages[0].content).toContain(STRICT_RETRY_SUFFIX);
+  });
+
+  it('使用自定义分类列表', () => {
+    const request = buildChatRequest(CONFIG, 'X', { categories: ['餐饮', '宠物'] });
+    const body = JSON.parse(request.body);
+    expect(body.messages[0].content).toContain('餐饮、宠物');
   });
 
   it('阿里云百炼地址关闭思考模式，其他服务商不加该参数', () => {
@@ -69,7 +84,7 @@ describe('buildChatRequest', () => {
 describe('parseExtraction', () => {
   it('解析完整回复', () => {
     const extraction = parseExtraction(
-      '```json\n{"is_payment": true, "amount": "23.50", "direction": "expense", "merchant": "肯德基", "category": "餐饮", "pay_method": "微信支付", "platform": "京东", "tx_time": "2026-09-18 12:30", "note": "订单 123", "confidence": "high"}\n```',
+      '```json\n{"is_payment": true, "amount": "23.50", "direction": "expense", "merchant": "肯德基", "category": "餐饮", "tx_time": "2026-09-18 12:30", "note": "订单 123", "confidence": "high"}\n```',
     );
     expect(extraction).toEqual({
       isPayment: true,
@@ -77,12 +92,19 @@ describe('parseExtraction', () => {
       direction: 'expense',
       merchant: '肯德基',
       category: '餐饮',
-      payMethod: '微信支付',
-      platform: '京东',
+      platform: null,
       txTime: '2026-09-18T12:30',
       note: '订单 123',
       confidence: 'high',
     });
+  });
+
+  it('识别自定义分类', () => {
+    const extraction = parseExtraction('{"amount": "1.00", "category": "宠物"}', [
+      '餐饮',
+      '宠物',
+    ]);
+    expect(extraction.category).toBe('宠物');
   });
 
   it('无法解析时抛 ParseError', () => {
@@ -99,7 +121,6 @@ describe('normalizeRaw', () => {
       direction: '收入',
       merchant: '  某商户  ',
       category: '不存在的分类',
-      pay_method: '微信',
       platform: '微信',
       tx_time: '2026/9/8 9:05',
       note: 12345,
@@ -110,7 +131,6 @@ describe('normalizeRaw', () => {
     expect(extraction.direction).toBe('income');
     expect(extraction.merchant).toBe('某商户');
     expect(extraction.category).toBe('其他');
-    expect(extraction.payMethod).toBeNull();
     expect(extraction.platform).toBe('微信');
     expect(extraction.txTime).toBe('2026-09-08T09:05');
     expect(extraction.note).toBe('12345');
@@ -123,6 +143,10 @@ describe('normalizeRaw', () => {
     expect(extraction.amountCents).toBeNull();
     expect(extraction.direction).toBe('expense');
     expect(extraction.category).toBe('其他');
+  });
+
+  it('平台不在列表内时置空', () => {
+    expect(normalizeRaw({ amount: '1.00', platform: '某宝' }).platform).toBeNull();
   });
 
   it('金额缺失时 is_payment 默认 false', () => {

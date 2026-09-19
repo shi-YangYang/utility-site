@@ -22,7 +22,7 @@ export function RecordRow({ record, onPress }: RecordRowProps) {
         </Text>
         <Text style={styles.subtitle} numberOfLines={1}>
           {time} · {record.category}
-          {record.payMethod ? ` · ${record.payMethod}` : ''}
+          {record.platform ? ` · ${record.platform}` : ''}
         </Text>
       </View>
       <Text

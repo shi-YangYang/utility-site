@@ -1,4 +1,4 @@
-import { CATEGORIES, DEFAULT_CATEGORY } from './categories';
+import { DEFAULT_CATEGORY } from './categories';
 import { normalizeTxTime, nowAsTxTime, txTimeToDisplay } from './dates';
 import { formatCents, parseAmountToCents } from './money';
 import type { Direction, LedgerRecord, LlmExtraction } from './types';
@@ -8,7 +8,6 @@ export interface RecordFormValues {
   direction: Direction;
   merchant: string;
   category: string;
-  payMethod: string;
   platform: string;
   txTime: string;
   note: string;
@@ -19,14 +18,9 @@ export interface ValidatedForm {
   direction: Direction;
   merchant: string | null;
   category: string;
-  payMethod: string | null;
   platform: string | null;
   txTime: string;
   note: string | null;
-}
-
-function isCategory(value: string): boolean {
-  return (CATEGORIES as readonly string[]).includes(value);
 }
 
 export function emptyFormValues(now: Date = new Date()): RecordFormValues {
@@ -35,7 +29,6 @@ export function emptyFormValues(now: Date = new Date()): RecordFormValues {
     direction: 'expense',
     merchant: '',
     category: DEFAULT_CATEGORY,
-    payMethod: '',
     platform: '',
     txTime: txTimeToDisplay(nowAsTxTime(now)),
     note: '',
@@ -50,8 +43,7 @@ export function formValuesFromExtraction(
     amount: extraction.amountCents != null ? formatCents(extraction.amountCents) : '',
     direction: extraction.direction,
     merchant: extraction.merchant ?? '',
-    category: isCategory(extraction.category) ? extraction.category : DEFAULT_CATEGORY,
-    payMethod: extraction.payMethod ?? '',
+    category: extraction.category || DEFAULT_CATEGORY,
     platform: extraction.platform ?? '',
     txTime: txTimeToDisplay(extraction.txTime ?? nowAsTxTime(now)),
     note: extraction.note ?? '',
@@ -64,7 +56,6 @@ export function formValuesFromRecord(record: LedgerRecord): RecordFormValues {
     direction: record.direction,
     merchant: record.merchant ?? '',
     category: record.category,
-    payMethod: record.payMethod ?? '',
     platform: record.platform ?? '',
     txTime: txTimeToDisplay(record.txTime),
     note: record.note ?? '',
@@ -85,8 +76,7 @@ export function validateFormValues(
       amountCents,
       direction: values.direction,
       merchant: values.merchant.trim() || null,
-      category: isCategory(values.category) ? values.category : DEFAULT_CATEGORY,
-      payMethod: values.payMethod || null,
+      category: values.category.trim() || DEFAULT_CATEGORY,
       platform: values.platform || null,
       txTime,
       note: values.note.trim() || null,

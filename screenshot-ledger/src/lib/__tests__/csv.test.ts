@@ -8,7 +8,6 @@ function makeRecord(overrides: Partial<LedgerRecord> = {}): LedgerRecord {
     direction: 'expense',
     merchant: '肯德基',
     category: '餐饮',
-    payMethod: '微信支付',
     platform: '京东',
     txTime: '2026-09-18T12:30',
     note: '订单 123',
@@ -25,21 +24,15 @@ describe('buildCsv', () => {
     const csv = buildCsv([makeRecord()]);
     const lines = csv.split('\r\n');
     expect(csv.startsWith('\uFEFF')).toBe(true);
-    expect(lines[0]).toBe('\uFEFF日期时间,方向,金额,分类,商户,支付方式,平台,备注');
-    expect(lines[1]).toBe('2026-09-18 12:30,支出,23.50,餐饮,肯德基,微信支付,京东,订单 123');
+    expect(lines[0]).toBe('\uFEFF日期时间,方向,金额,分类,商户,平台,备注');
+    expect(lines[1]).toBe('2026-09-18 12:30,支出,23.50,餐饮,肯德基,京东,订单 123');
   });
 
   it('收入方向与空字段', () => {
     const csv = buildCsv([
-      makeRecord({
-        direction: 'income',
-        merchant: null,
-        payMethod: null,
-        platform: null,
-        note: null,
-      }),
+      makeRecord({ direction: 'income', merchant: null, platform: null, note: null }),
     ]);
-    expect(csv.split('\r\n')[1]).toBe('2026-09-18 12:30,收入,23.50,餐饮,,,,');
+    expect(csv.split('\r\n')[1]).toBe('2026-09-18 12:30,收入,23.50,餐饮,,,');
   });
 
   it('转义逗号、引号与换行', () => {
@@ -49,7 +42,7 @@ describe('buildCsv', () => {
   });
 
   it('空记录只有表头', () => {
-    expect(buildCsv([])).toBe('\uFEFF日期时间,方向,金额,分类,商户,支付方式,平台,备注');
+    expect(buildCsv([])).toBe('\uFEFF日期时间,方向,金额,分类,商户,平台,备注');
   });
 });
 

@@ -42,7 +42,6 @@ export function buildReportHtml(records: LedgerRecord[], options: ReportOptions)
         <td class="num">${record.direction === 'income' ? '+' : '-'}${formatCents(record.amountCents)}</td>
         <td>${escapeHtml(record.category)}</td>
         <td>${escapeHtml(record.merchant ?? '')}</td>
-        <td>${escapeHtml(record.payMethod ?? '')}</td>
         <td>${escapeHtml(record.note ?? '')}</td>
       </tr>`,
     )
@@ -82,7 +81,7 @@ export function buildReportHtml(records: LedgerRecord[], options: ReportOptions)
   </table>
   <h2>明细</h2>
   <table>
-    <thead><tr><th>时间</th><th>方向</th><th class="num">金额</th><th>分类</th><th>商户</th><th>支付方式</th><th>备注</th></tr></thead>
+    <thead><tr><th>时间</th><th>方向</th><th class="num">金额</th><th>分类</th><th>商户</th><th>备注</th></tr></thead>
     <tbody>${detailRows}</tbody>
   </table>
 </body>

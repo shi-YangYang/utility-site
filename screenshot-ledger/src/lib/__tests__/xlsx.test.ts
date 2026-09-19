@@ -10,7 +10,6 @@ function makeRecord(overrides: Partial<LedgerRecord> = {}): LedgerRecord {
     direction: 'expense',
     merchant: '肯德基',
     category: '餐饮',
-    payMethod: '微信支付',
     platform: '京东',
     txTime: '2026-09-18T12:30',
     note: '订单 123',
@@ -37,21 +36,15 @@ describe('buildWorkbookBase64', () => {
     expect(rows[0]['金额']).toBe(23.5);
     expect(rows[0]['分类']).toBe('餐饮');
     expect(rows[0]['商户']).toBe('肯德基');
-    expect(rows[0]['支付方式']).toBe('微信支付');
     expect(rows[0]['平台']).toBe('京东');
     expect(rows[0]['备注']).toBe('订单 123');
+    expect(rows[0]['支付方式']).toBeUndefined();
   });
 
   it('收入方向与空字段', () => {
     const rows = readRows(
       buildWorkbookBase64([
-        makeRecord({
-          direction: 'income',
-          merchant: null,
-          payMethod: null,
-          platform: null,
-          note: null,
-        }),
+        makeRecord({ direction: 'income', merchant: null, platform: null, note: null }),
       ]),
     );
     expect(rows[0]['方向']).toBe('收入');

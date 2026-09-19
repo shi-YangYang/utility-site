@@ -7,8 +7,8 @@ export const XLSX_MIME =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 const SHEET_NAME = '账目';
-const HEADERS = ['日期时间', '方向', '金额', '分类', '商户', '支付方式', '平台', '备注'];
-const COLUMN_WIDTHS = [18, 8, 10, 8, 20, 12, 10, 30];
+const HEADERS = ['日期时间', '方向', '金额', '分类', '商户', '平台', '备注'];
+const COLUMN_WIDTHS = [18, 8, 10, 8, 20, 10, 30];
 
 function toRow(record: LedgerRecord): (string | number)[] {
   return [
@@ -17,7 +17,6 @@ function toRow(record: LedgerRecord): (string | number)[] {
     record.amountCents / 100,
     record.category,
     record.merchant ?? '',
-    record.payMethod ?? '',
     record.platform ?? '',
     record.note ?? '',
   ];

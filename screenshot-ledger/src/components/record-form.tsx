@@ -1,5 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -12,7 +14,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { CATEGORIES, PAY_METHODS, PLATFORMS } from '@/lib/categories';
+import { listCategories } from '@/db/categories';
+import { DEFAULT_CATEGORIES, PLATFORMS } from '@/lib/categories';
 import { validateFormValues, type RecordFormValues, type ValidatedForm } from '@/lib/form';
 import type { Direction } from '@/lib/types';
 
@@ -42,7 +45,26 @@ export function RecordForm({
   const [values, setValues] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [showTimeHint, setShowTimeHint] = useState(timeInferred);
+  const [categories, setCategories] = useState<string[]>([...DEFAULT_CATEGORIES]);
   const insets = useSafeAreaInsets();
+
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      void (async () => {
+        const list = await listCategories();
+        if (alive) setCategories(list);
+      })();
+      return () => {
+        alive = false;
+      };
+    }, []),
+  );
+
+  const categoryOptions =
+    values.category && !categories.includes(values.category)
+      ? [...categories, values.category]
+      : categories;
 
   function patch(changes: Partial<RecordFormValues>) {
     setValues((prev) => ({ ...prev, ...changes }));
@@ -124,19 +146,16 @@ export function RecordForm({
         placeholderTextColor={Colors.subText}
       />
 
-      <Text style={styles.label}>分类</Text>
+      <View style={styles.labelRow}>
+        <Text style={styles.label}>分类</Text>
+        <Pressable hitSlop={8} onPress={() => router.push('/categories')}>
+          <Text style={styles.labelAction}>管理</Text>
+        </Pressable>
+      </View>
       <ChipGroup
-        options={CATEGORIES}
+        options={categoryOptions}
         value={values.category}
         onChange={(category) => patch({ category })}
-      />
-
-      <Text style={styles.label}>支付方式</Text>
-      <ChipGroup
-        options={PAY_METHODS}
-        value={values.payMethod}
-        onChange={(payMethod) => patch({ payMethod })}
-        allowClear
       />
 
       <Text style={styles.label}>平台</Text>
@@ -226,6 +245,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.subText,
     marginTop: Spacing.lg,
+    marginBottom: Spacing.sm,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  labelAction: {
+    fontSize: 13,
+    color: Colors.primary,
     marginBottom: Spacing.sm,
   },
   amountRow: {

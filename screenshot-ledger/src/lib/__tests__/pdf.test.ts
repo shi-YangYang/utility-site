@@ -8,7 +8,6 @@ function makeRecord(overrides: Partial<LedgerRecord> = {}): LedgerRecord {
     direction: 'expense',
     merchant: '肯德基',
     category: '餐饮',
-    payMethod: '微信支付',
     platform: '京东',
     txTime: '2026-09-18T12:30',
     note: '订单 123',
@@ -31,6 +30,7 @@ describe('buildReportHtml', () => {
     expect(html).toContain('肯德基');
     expect(html).toContain('餐饮');
     expect(html).toContain('1 笔');
+    expect(html).not.toContain('支付方式');
   });
 
   it('转义用户输入里的 HTML', () => {

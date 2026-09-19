@@ -1,7 +1,9 @@
 import * as SQLite from 'expo-sqlite';
 
+import { DEFAULT_CATEGORIES } from '@/lib/categories';
+
 const DATABASE_NAME = 'screenshot-ledger.db';
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -36,6 +38,22 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       );
       CREATE INDEX IF NOT EXISTS idx_records_tx_time ON records (tx_time);
     `);
+  }
+
+  if (version < 2) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS categories (
+        name TEXT PRIMARY KEY NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0
+      );
+    `);
+    for (let i = 0; i < DEFAULT_CATEGORIES.length; i += 1) {
+      await db.runAsync(
+        'INSERT OR IGNORE INTO categories (name, sort_order) VALUES (?, ?)',
+        DEFAULT_CATEGORIES[i],
+        i,
+      );
+    }
   }
 
   if (version < SCHEMA_VERSION) {

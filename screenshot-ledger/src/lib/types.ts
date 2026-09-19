@@ -5,7 +5,6 @@ export interface RecordDraft {
   direction: Direction;
   merchant: string | null;
   category: string;
-  payMethod: string | null;
   platform: string | null;
   txTime: string;
   note: string | null;
@@ -33,7 +32,6 @@ export interface LlmExtraction {
   direction: Direction;
   merchant: string | null;
   category: string;
-  payMethod: string | null;
   platform: string | null;
   txTime: string | null;
   note: string | null;

@@ -39,6 +39,25 @@ const CATEGORY_COLORS: Record<string, string> = {
   其他: '#9CA3AF',
 };
 
+const FALLBACK_PALETTE = [
+  '#F59E0B',
+  '#3B82F6',
+  '#10B981',
+  '#8B5CF6',
+  '#EC4899',
+  '#EF4444',
+  '#14B8A6',
+  '#6366F1',
+  '#84CC16',
+  '#F97316',
+];
+
 export function categoryColor(category: string): string {
-  return CATEGORY_COLORS[category] ?? CATEGORY_COLORS['其他'];
+  const known = CATEGORY_COLORS[category];
+  if (known) return known;
+  let hash = 0;
+  for (const char of category) {
+    hash = (hash * 31 + (char.codePointAt(0) ?? 0)) % 100000;
+  }
+  return FALLBACK_PALETTE[hash % FALLBACK_PALETTE.length];
 }

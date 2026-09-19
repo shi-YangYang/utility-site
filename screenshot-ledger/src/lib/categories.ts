@@ -1,4 +1,4 @@
-export const CATEGORIES = [
+export const DEFAULT_CATEGORIES = [
   '餐饮',
   '购物',
   '交通',
@@ -10,16 +10,14 @@ export const CATEGORIES = [
   '其他',
 ] as const;
 
-export const PAY_METHODS = [
-  '微信支付',
-  '支付宝',
-  '银行卡',
-  '花呗',
-  '白条',
-  '余额',
-  '其他',
-] as const;
+export const DEFAULT_CATEGORY = '其他';
+export const MAX_CATEGORY_LENGTH = 8;
 
 export const PLATFORMS = ['京东', '淘宝', '拼多多', '微信', '支付宝', '其他'] as const;
 
-export const DEFAULT_CATEGORY = '其他';
+export function normalizeCategoryName(input: string): string | null {
+  const name = input.trim();
+  if (!name) return null;
+  if ([...name].length > MAX_CATEGORY_LENGTH) return null;
+  return name;
+}

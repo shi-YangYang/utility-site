@@ -6,6 +6,7 @@
 ## 功能
 
 - 单张或批量（最多 10 张）截图识别，结果可改再保存；失败可重试或手动填写
+- 分类可自定义：表单里「分类 → 管理」进入分类管理页，可新增/删除；识别提示词跟随自定义列表
 - 重复导入有提醒；识别不到交易时间时预填当前时间并提示
 - 账本按日分组、可编辑删除；汇总按月看收支与分类占比
 - 汇总页「导出账目」：Excel（.xlsx）/ CSV / PDF（汇总+明细）/ PNG 汇总卡，
@@ -63,7 +64,7 @@ cd android && ./gradlew assembleRelease
 ## 开发
 
 ```sh
-npm test           # Jest：金额/日期/汇总/表单/导出（Excel/CSV/PDF）/LLM 解析与客户端，59 个用例
+npm test           # Jest：金额/日期/汇总/表单/导出（Excel/CSV/PDF）/LLM 解析与客户端，65 个用例
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -71,7 +72,7 @@ npm run typecheck  # tsc --noEmit
 
 ## 状态
 
-- 已通过：`tsc`、Jest 59/59（含本地 HTTP mock 的 LLM 客户端测试）、Android bundle 导出、`expo-doctor` 21/21
+- 已通过：`tsc`、Jest 65/65（含本地 HTTP mock 的 LLM 客户端测试）、Android bundle 导出、`expo-doctor` 21/21
 - 真机：单张识别 → 保存 → 汇总 已验证；批量流程与导出待复测
 - 未执行：`prebuild + gradlew` 的实际 APK 构建（开发机无 JDK/Android SDK）
 - 隐私：截图会发送给配置的 LLM 服务商用于识别；账目只在本机，卸载即删（可用「导出 CSV」自行备份）

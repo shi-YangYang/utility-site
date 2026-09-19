@@ -12,7 +12,6 @@ const EXTRACTION: LlmExtraction = {
   direction: 'expense',
   merchant: '肯德基',
   category: '餐饮',
-  payMethod: '微信支付',
   platform: '京东',
   txTime: '2026-09-18T12:30',
   note: '订单 123',
@@ -25,7 +24,6 @@ const RECORD: LedgerRecord = {
   direction: 'expense',
   merchant: '肯德基',
   category: '餐饮',
-  payMethod: '微信支付',
   platform: '京东',
   txTime: '2026-09-18T12:30',
   note: '订单 123',
@@ -43,7 +41,6 @@ describe('emptyFormValues', () => {
       direction: 'expense',
       merchant: '',
       category: '其他',
-      payMethod: '',
       platform: '',
       txTime: '2026-09-18 12:30',
       note: '',
@@ -88,16 +85,24 @@ describe('validateFormValues', () => {
   }
 
   it('通过合法输入并做清洗', () => {
-    const result = validateFormValues(
-      valuesWith({ merchant: '  肯德基  ', note: '  订单  ', category: '不存在' }),
-    );
+    const result = validateFormValues(valuesWith({ merchant: '  肯德基  ', note: '  订单  ' }));
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.merchant).toBe('肯德基');
       expect(result.value.note).toBe('订单');
-      expect(result.value.category).toBe('其他');
-      expect(result.value.payMethod).toBeNull();
     }
+  });
+
+  it('自定义分类原样保留', () => {
+    const result = validateFormValues(valuesWith({ category: '宠物' }));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.category).toBe('宠物');
+  });
+
+  it('分类为空时回退到「其他」', () => {
+    const result = validateFormValues(valuesWith({ category: '  ' }));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.category).toBe('其他');
   });
 
   it('拒绝非法金额与时间', () => {
@@ -109,12 +114,11 @@ describe('validateFormValues', () => {
 
   it('空字符串转为 null', () => {
     const result = validateFormValues(
-      valuesWith({ merchant: '  ', payMethod: '', platform: '', note: '' }),
+      valuesWith({ merchant: '  ', platform: '', note: '' }),
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.merchant).toBeNull();
-      expect(result.value.payMethod).toBeNull();
       expect(result.value.platform).toBeNull();
       expect(result.value.note).toBeNull();
     }
