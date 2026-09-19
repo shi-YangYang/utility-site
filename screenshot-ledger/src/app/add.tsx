@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import type { ImagePickerAsset } from 'expo-image-picker';
 
 import { DraftCard } from '@/components/draft-card';
+import { ProgressBar } from '@/components/progress-bar';
 import { RecordForm } from '@/components/record-form';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { countRecordsWithImageHash, insertRecord } from '@/db/records';
@@ -286,10 +287,16 @@ export default function AddScreen() {
     ).length;
     return (
       <View style={styles.wrap}>
-        <View style={styles.header}>
-          <ActivityIndicator color={Colors.primary} />
-          <Text style={styles.headerText}>
-            正在识别 {Math.min(done + 1, total)} / {total} 张…
+        <View style={styles.progressHeader}>
+          <View style={styles.progressHeaderRow}>
+            <ActivityIndicator size="small" color={Colors.primary} />
+            <Text style={styles.headerText}>
+              正在识别第 {Math.min(done + 1, total)} / {total} 张
+            </Text>
+          </View>
+          <ProgressBar ratio={total > 0 ? done / total : 0} />
+          <Text style={styles.progressHint}>
+            已识别 {done} / {total} 张
           </Text>
         </View>
         <ScrollView contentContainerStyle={styles.listContent}>
@@ -327,6 +334,12 @@ export default function AddScreen() {
         <Text style={styles.progress}>
           正在保存 {savedCount} / {saveTotal} 笔…
         </Text>
+        <View style={styles.saveProgress}>
+          <ProgressBar
+            ratio={saveTotal > 0 ? savedCount / saveTotal : 0}
+            color={Colors.income}
+          />
+        </View>
       </View>
     );
   }
@@ -388,6 +401,7 @@ export default function AddScreen() {
               badges={badges}
               excluded={step.excluded || step.status === 'saved'}
               hasError={step.error != null}
+              busy={step.status === 'preparing' || step.status === 'recognizing'}
               onPress={() => {
                 setEditIndex(index);
                 setPhase('edit');
@@ -485,6 +499,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.sm,
     paddingVertical: Spacing.md,
+  },
+  progressHeader: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  progressHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  progressHint: {
+    fontSize: 12,
+    color: Colors.subText,
+    textAlign: 'center',
+  },
+  saveProgress: {
+    width: '80%',
+    marginTop: Spacing.md,
   },
   headerText: {
     fontSize: 15,

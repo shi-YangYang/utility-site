@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import type { Direction } from '@/lib/types';
@@ -13,6 +13,7 @@ interface DraftCardProps {
   badges: string[];
   excluded: boolean;
   hasError: boolean;
+  busy?: boolean;
   onPress: () => void;
   onToggleExclude: () => void;
   onRetry: () => void;
@@ -28,6 +29,7 @@ export function DraftCard({
   badges,
   excluded,
   hasError,
+  busy = false,
   onPress,
   onToggleExclude,
   onRetry,
@@ -35,7 +37,7 @@ export function DraftCard({
 }: DraftCardProps) {
   return (
     <View style={[styles.card, excluded && styles.cardExcluded]}>
-      <Pressable style={styles.main} onPress={onPress}>
+      <Pressable style={styles.main} onPress={onPress} disabled={busy}>
         <Image source={{ uri: imageUri }} style={styles.thumb} contentFit="cover" />
         <View style={styles.info}>
           <Text style={styles.title} numberOfLines={1}>
@@ -60,7 +62,12 @@ export function DraftCard({
         </Text>
       </Pressable>
       <View style={styles.actions}>
-        {hasError ? (
+        {busy ? (
+          <View style={styles.busyRow}>
+            <ActivityIndicator size="small" color={Colors.primary} />
+            <Text style={styles.busyText}>正在识别…</Text>
+          </View>
+        ) : hasError ? (
           <>
             <Pressable onPress={onRetry} hitSlop={8}>
               <Text style={styles.action}>重试</Text>
@@ -155,5 +162,14 @@ const styles = StyleSheet.create({
   action: {
     fontSize: 13,
     color: Colors.primary,
+  },
+  busyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  busyText: {
+    fontSize: 13,
+    color: Colors.subText,
   },
 });
