@@ -1,6 +1,9 @@
 # CD：合并到 main 后执行，按改动目录通过 SSH 部署到服务器。
-# 只监听"可部署单元"路径（on.push.paths），App 类子项目的改动不会触发本工作流；
-# 即使被触发，没有 docker-compose.yml / compose.yml 的子项目也会被跳过，不视为失败。
+# 只在"会影响部署"的路径上触发与部署：
+#   - recording/**            → 部署 recording（若有 compose；否则跳过）
+#   - deploy/proxy/**         → 部署共享代理
+#   - deploy/scripts/**       → 部署全部（all）
+#   - 其他（含 deploy 下文档、App 类子项目、.github）→ 不触发、不部署
 #
 # - 新增需要服务器部署的子项目时：在下面 on.push.paths 加一行它的目录，
 #   并在 deploy/ports.md 登记端口（说明见 deploy/README.md）；
@@ -18,7 +21,8 @@ on:
     branches: [main]
     paths:
       - 'recording/**'
-      - 'deploy/**'
+      - 'deploy/proxy/**'
+      - 'deploy/scripts/**'
   workflow_dispatch:
     inputs:
       project:
@@ -53,14 +57,16 @@ jobs:
             if [ "$before" = "0000000000000000000000000000000000000000" ]; then
               changed=""
             else
-              changed=$(git diff --name-only "$before...HEAD" | awk -F/ 'NF > 1 { print $1 }' | sort -u)
+              changed=$(git diff --name-only "$before...HEAD")
             fi
             targets=""
             for p in $changed; do
               case "$p" in
-                deploy) targets="$targets all" ;;
-                .github) : ;; # 仅流水线自身变化，不影响运行中的服务
-                *) targets="$targets $p" ;;
+                .github/*) : ;;                    # 仅流水线自身变化，不影响运行中的服务
+                deploy/proxy/*) targets="$targets proxy" ;;
+                deploy/scripts/*) targets="$targets all" ;;
+                deploy/*) : ;;                     # deploy 下的文档改动：不部署
+                */*) targets="$targets ${p%%/*}" ;; # 子项目：下面按是否有 compose 过滤
               esac
             done
             deployable=""

@@ -68,7 +68,7 @@ cp Caddyfile.example Caddyfile
 | 文件 | 触发 | 做什么 |
 |---|---|---|
 | `ci.yml` | PR 到 `main` | 只校验本次改动到的子项目：`deploy` 做 shell/compose 校验；`recording` 做 `node --check`、compose 校验与镜像构建；`screenshot-ledger` 做 `tsc` 与 Jest 单测；不做全量重验 |
-| `cd.yml` | 合并到 `main`（或手动运行） | 只监听可部署路径（`on.push.paths`：`recording/**`、`deploy/**`），App 类子项目的改动不触发；被触发时按改动目录 SSH 部署，`deploy/` 变化 → `all`；没有 compose 文件（无可部署单元）的子项目自动跳过并打 notice。**新增需要服务器部署的子项目时，要在 `cd.yml` 的 `paths` 加一行它的目录** |
+| `cd.yml` | 合并到 `main`（或手动运行） | 只在会影响部署的路径上触发：`recording/**`、`deploy/proxy/**`（→ 代理）、`deploy/scripts/**`（→ `all`）；`deploy/` 下的文档、App 类子项目、`.github/` 不触发。被触发时按改动部署，没有 compose 文件的子项目自动跳过并打 notice。**新增需要服务器部署的子项目时，要在 `cd.yml` 的 `paths` 加一行它的目录** |
 
 **使用前需要在 GitHub 配置**（Settings → Secrets and variables → Actions）：
 
