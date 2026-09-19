@@ -1,4 +1,5 @@
 # CD：合并到 main 后执行，按改动目录通过 SSH 部署到服务器。
+# 没有 docker-compose.yml / compose.yml 的子项目（如 App 类）会自动跳过，不视为失败。
 #
 # - 服务器凭据（SSH_HOST / SSH_USER / SSH_KEY）未配置时跳过并提示，不失败；
 # - 还需要仓库变量 DEPLOY_PATH（服务器上仓库的绝对路径）；
@@ -56,6 +57,22 @@ jobs:
                 *) targets="$targets $p" ;;
               esac
             done
+            deployable=""
+            for t in $targets; do
+              case "$t" in
+                all|proxy)
+                  deployable="$deployable $t"
+                  ;;
+                *)
+                  if [ -f "$t/docker-compose.yml" ] || [ -f "$t/compose.yml" ]; then
+                    deployable="$deployable $t"
+                  else
+                    echo "::notice::跳过 $t：没有 docker-compose.yml / compose.yml（非可部署子项目）"
+                  fi
+                  ;;
+              esac
+            done
+            targets="$deployable"
           fi
           targets=$(printf '%s\n' $targets | sort -u | tr '\n' ' ')
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
