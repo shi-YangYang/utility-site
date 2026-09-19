@@ -1,0 +1,24 @@
+# 本项目单独一份 .gitignore 的原因（根规范 5.1）：
+# 以下规则只对 Expo / Android 项目成立，写进根 .gitignore 会变成全站规则、可能误伤其他子项目。
+# 通用规则（node_modules/、.env、.DS_Store、*.log 等）仍然由根 .gitignore 负责。
+
+# Expo
+.expo/
+web-build/
+expo-env.d.ts
+
+# prebuild 生成的原生工程（可随时用 npx expo prebuild 重建，不入库）
+/android
+/ios
+
+# Android 构建产物与签名材料 —— 绝不入库
+*.apk
+*.aab
+*.jks
+*.keystore
+keystore.properties
+
+# Metro / TypeScript
+*.orig.*
+.metro-health-check*
+*.tsbuildinfo
