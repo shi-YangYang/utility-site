@@ -48,11 +48,17 @@ npm install
 cp .env.example .env    # 确认这里是你想打进包里的配置
 npx expo prebuild -p android
 cd android && ./gradlew assembleRelease
-# 产物：android/app/build/outputs/apk/release/app-release.apk
+# 产物按 CPU 架构拆分（各约 30MB）：
+#   app-arm64-v8a-release.apk    ← 现代手机，发给同事用这个
+#   app-armeabi-v7a-release.apk  ← 老机型备用
 ```
 
-默认 debug 签名可直接安装；正式签名用自建 keystore，密钥不入库。
-没有本地 Android 环境时可用 `eas build -p android --profile preview` 云构建（需 Expo 账号）。
+- **正式签名**：使用本机的 `release.keystore`，密码在 `keystore.properties`（两者都不入库，
+  由 `plugins/with-release-build.js` 在 prebuild 时注入）。**请自行备份这两个文件**，
+  丢失后无法对已安装的 App 覆盖升级；之前装过 debug 签名版本的手机需先卸载再装。
+- **体积**：仅打包 arm64/armv7 两种架构并压缩原生库（从全架构 109MB 降到 ~30MB）。
+  要调整架构或恢复全架构包，改插件里的 `include` / `universalApk` 即可。
+- 没有本地 Android 环境时可用 `eas build -p android --profile preview` 云构建（需 Expo 账号）。
 
 ## 开发
 

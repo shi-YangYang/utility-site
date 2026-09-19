@@ -39,7 +39,7 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
+    "android": "expo run:android",
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "export:android": "expo export --platform android"
