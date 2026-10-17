@@ -46,6 +46,15 @@ const SIGNING_CONFIGS_PATCHED = `    signingConfigs {
 const RELEASE_SIGNING_ORIGINAL = `            signingConfig signingConfigs.debug
             def enableShrinkResources`;
 
+const ENV_INPUT_BLOCK = `// EXPO_PUBLIC_* 在 JS 打包期内联进 bundle：让 .env 变化自动触发重新打包
+def envFile = rootProject.file("../.env")
+if (envFile.exists()) {
+    tasks.matching { it.name.startsWith('createBundle') }.configureEach {
+        inputs.file(envFile)
+    }
+}
+`;
+
 const RELEASE_SIGNING_PATCHED = `            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
             def enableShrinkResources`;
 
@@ -62,6 +71,9 @@ module.exports = function withReleaseBuild(config) {
     }
     if (contents.includes(RELEASE_SIGNING_ORIGINAL)) {
       contents = contents.replace(RELEASE_SIGNING_ORIGINAL, RELEASE_SIGNING_PATCHED);
+    }
+    if (!contents.includes('inputs.file(envFile)')) {
+      contents += `\n${ENV_INPUT_BLOCK}`;
     }
 
     cfg.modResults.contents = contents;
