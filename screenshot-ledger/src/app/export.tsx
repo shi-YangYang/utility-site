@@ -5,12 +5,15 @@ import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { captureRef } from 'react-native-view-shot';
 
 import { ChipGroup } from '@/components/chip-group';
@@ -20,9 +23,17 @@ import { buildCsv, CSV_MIME } from '@/lib/csv';
 import { monthKeyOf, monthLabel } from '@/lib/dates';
 import {
   canShare,
-  shareBase64File,
-  shareImageFile,
-  shareTextFile,
+  copyImageFile,
+  readDocumentBase64,
+  readDocumentText,
+  removeFile,
+  requestDocumentFolder,
+  requestMediaPermission,
+  saveDocumentToFolder,
+  saveImageToLibrary,
+  shareFile,
+  writeBase64File,
+  writeTextFile,
 } from '@/lib/export';
 import { customExportBaseName, exportBaseName } from '@/lib/export-names';
 import { EXPORT_HEADERS } from '@/lib/export-columns';
@@ -72,6 +83,23 @@ const FORMATS: FormatOption[] = [
 
 const PREVIEW_LIMIT = 8;
 const IMAGE_ROW_LIMIT = 60;
+const MODAL_PREVIEW_LIMIT = 200;
+
+const MIME_BY_KIND: Record<FormatKey, string> = {
+  xlsx: XLSX_MIME,
+  csv: CSV_MIME,
+  pdf: PDF_MIME,
+  image: 'image/png',
+};
+
+const PREVIEW_HINTS: Record<FormatKey, string> = {
+  xlsx: '表格与 .xlsx 文件内容一致；可将文件保存到手机或分享出去',
+  csv: '表格与 .csv 文件内容一致；可将文件保存到手机或分享出去',
+  pdf: '实际 PDF 中明细表后还附分类占比统计',
+  image: '图片内容与实际导出文件一致',
+};
+
+const SAVE_FOLDER_KEY = 'ledgerSaveFolderUri';
 
 function formatStamp(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -89,6 +117,9 @@ export default function ExportScreen() {
   const [monthRecords, setMonthRecords] = useState<LedgerRecord[] | null>(null);
   const [allRecords, setAllRecords] = useState<LedgerRecord[] | null>(null);
   const [busy, setBusy] = useState<FormatKey | null>(null);
+  const [preview, setPreview] = useState<
+    { kind: FormatKey; uri: string; fileName: string } | null
+  >(null);
   const snapRef = useRef<View>(null);
 
   useFocusEffect(
@@ -135,6 +166,12 @@ export default function ExportScreen() {
     records != null && records.length > IMAGE_ROW_LIMIT
       ? `其余 ${records.length - IMAGE_ROW_LIMIT} 笔未展示，完整数据可导出 Excel/CSV/PDF`
       : undefined;
+  const previewTableRows =
+    records == null ? [] : records.slice(0, MODAL_PREVIEW_LIMIT);
+  const modalTailNote =
+    records != null && records.length > MODAL_PREVIEW_LIMIT
+      ? `仅展示前 ${MODAL_PREVIEW_LIMIT} 条，导出文件为完整 ${records.length} 条`
+      : undefined;
 
   function toggleRecord(id: number) {
     setSelectedIds((prev) =>
@@ -150,7 +187,7 @@ export default function ExportScreen() {
     setSelectedIds([]);
   }
 
-  async function run(key: FormatKey, task: (rows: LedgerRecord[]) => Promise<void>) {
+  async function handleExport(key: FormatKey) {
     if (!records || records.length === 0) {
       Alert.alert(
         '没有可导出的记录',
@@ -162,13 +199,31 @@ export default function ExportScreen() {
       );
       return;
     }
-    if (!(await canShare())) {
-      Alert.alert('无法导出', '当前设备不支持系统分享。');
-      return;
-    }
     setBusy(key);
     try {
-      await task(records);
+      let uri: string;
+      let fileName: string;
+      if (key === 'xlsx') {
+        fileName = `${fileBase}.xlsx`;
+        uri = writeBase64File(buildWorkbookBase64(records), fileName);
+      } else if (key === 'csv') {
+        fileName = `${fileBase}.csv`;
+        uri = writeTextFile(buildCsv(records), fileName);
+      } else if (key === 'pdf') {
+        const html = buildReportHtml(records, {
+          title: `截图记账 · ${scopeLabel}`,
+          generatedAt: new Date(),
+        });
+        const { base64 } = await Print.printToFileAsync({ html, base64: true });
+        if (!base64) throw new Error('PDF 文件为空');
+        fileName = `${fileBase}.pdf`;
+        uri = writeBase64File(base64, fileName);
+      } else {
+        const shot = await captureRef(snapRef, { format: 'png', quality: 1, result: 'tmpfile' });
+        fileName = `${fileBase}.png`;
+        uri = copyImageFile(shot, fileName);
+      }
+      setPreview({ kind: key, uri, fileName });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       Alert.alert('导出失败', detail || '请重试。');
@@ -177,35 +232,81 @@ export default function ExportScreen() {
     }
   }
 
-  function handleExport(key: FormatKey) {
-    if (key === 'xlsx') {
-      void run(key, async (rows) => {
-        await shareBase64File(buildWorkbookBase64(rows), `${fileBase}.xlsx`, XLSX_MIME);
-      });
+  async function confirmShare() {
+    const active = preview;
+    if (!active) return;
+    if (!(await canShare())) {
+      Alert.alert('无法分享', '当前设备不支持系统分享。');
       return;
     }
-    if (key === 'csv') {
-      void run(key, async (rows) => {
-        await shareTextFile(buildCsv(rows), `${fileBase}.csv`, CSV_MIME);
-      });
-      return;
+    try {
+      await shareFile(active.uri, MIME_BY_KIND[active.kind]);
+      removeFile(active.uri);
+      setPreview(null);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      Alert.alert('分享失败', detail || '请重试。');
     }
-    if (key === 'pdf') {
-      void run(key, async (rows) => {
-        const html = buildReportHtml(rows, {
-          title: `截图记账 · ${scopeLabel}`,
-          generatedAt: new Date(),
-        });
-        const { base64 } = await Print.printToFileAsync({ html, base64: true });
-        if (!base64) throw new Error('PDF 文件为空');
-        await shareBase64File(base64, `${fileBase}.pdf`, PDF_MIME);
-      });
-      return;
+  }
+
+  function cancelPreview() {
+    const active = preview;
+    if (active) {
+      try {
+        removeFile(active.uri);
+      } catch {}
     }
-    void run(key, async () => {
-      const uri = await captureRef(snapRef, { format: 'png', quality: 1, result: 'tmpfile' });
-      await shareImageFile(uri, `${fileBase}.png`);
-    });
+    setPreview(null);
+  }
+
+  async function getSaveFolder(): Promise<string | null> {
+    const saved = await AsyncStorage.getItem(SAVE_FOLDER_KEY);
+    if (saved) return saved;
+    const folderUri = await requestDocumentFolder();
+    if (!folderUri) return null;
+    await AsyncStorage.setItem(SAVE_FOLDER_KEY, folderUri);
+    return folderUri;
+  }
+
+  function saveStamp(date: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(date.getHours())}${pad(date.getMinutes())}`;
+  }
+
+  async function confirmSave() {
+    const active = preview;
+    if (!active) return;
+    try {
+      if (active.kind === 'image') {
+        if (!(await requestMediaPermission())) {
+          Alert.alert('无法保存', '需要相册权限才能保存图片，可在系统设置里开启。');
+          return;
+        }
+        await saveImageToLibrary(active.uri);
+        removeFile(active.uri);
+        setPreview(null);
+        Alert.alert('已保存', '图片已存入相册「截图记账」。');
+        return;
+      }
+      const folderUri = await getSaveFolder();
+      if (!folderUri) return;
+      const dotIndex = active.fileName.lastIndexOf('.');
+      const base =
+        dotIndex > 0 ? active.fileName.slice(0, dotIndex) : active.fileName;
+      const ext = dotIndex > 0 ? active.fileName.slice(dotIndex + 1) : '';
+      const saveName = `${base}-${saveStamp(new Date())}${ext ? `.${ext}` : ''}`;
+      const isBase64 = active.kind !== 'csv';
+      const content = isBase64
+        ? await readDocumentBase64(active.uri)
+        : await readDocumentText(active.uri);
+      await saveDocumentToFolder(folderUri, saveName, MIME_BY_KIND[active.kind], content, isBase64);
+      removeFile(active.uri);
+      setPreview(null);
+      Alert.alert('已保存', `${saveName}\n已保存到所选文件夹。`);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      Alert.alert('保存失败', detail || '请重试。');
+    }
   }
 
   if (records == null) {
@@ -217,7 +318,8 @@ export default function ExportScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+    <>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Text style={styles.sectionLabel}>导出范围</Text>
       <ChipGroup
         options={['本月', '全部', '自选']}
@@ -343,7 +445,60 @@ export default function ExportScreen() {
           <DetailTable rows={captureRows} tailNote={imageTailNote} />
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+
+      <Modal visible={preview != null} animationType="slide" onRequestClose={cancelPreview}>
+        <View style={styles.modalRoot}>
+          {preview ? (
+            <>
+              <View style={styles.modalHeader}>
+                <Pressable hitSlop={8} onPress={cancelPreview}>
+                  <Ionicons name="close" size={22} color={Colors.text} />
+                </Pressable>
+                <View style={styles.modalTitleWrap}>
+                  <Text style={styles.modalTitle} numberOfLines={1}>
+                    {preview.fileName}
+                  </Text>
+                  <Text style={styles.modalHint}>{PREVIEW_HINTS[preview.kind]}</Text>
+                </View>
+                <View style={styles.modalHeaderSpacer} />
+              </View>
+              {preview.kind === 'image' ? (
+                <Image source={{ uri: preview.uri }} style={styles.modalImage} resizeMode="contain" />
+              ) : (
+                <ScrollView
+                  style={styles.modalBody}
+                  contentContainerStyle={styles.modalBodyContent}>
+                  <View style={styles.card}>
+                    <SummaryBlock title={`截图记账 · ${scopeLabel}`} summary={summary} />
+                  </View>
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>明细</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.modalTableScroll}>
+                      <DetailTable rows={previewTableRows} tailNote={modalTailNote} />
+                    </ScrollView>
+                  </View>
+                </ScrollView>
+              )}
+              <View style={styles.modalBar}>
+                <Pressable style={styles.shareButton} onPress={() => void confirmShare()}>
+                  <Text style={styles.shareButtonText}>分享</Text>
+                </Pressable>
+                <Pressable style={styles.saveButton} onPress={() => void confirmSave()}>
+                  <Text style={styles.saveButtonText}>保存</Text>
+                </Pressable>
+                <Pressable style={styles.modalCancelButton} onPress={cancelPreview}>
+                  <Text style={styles.modalCancelText}>取消</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : null}
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -573,6 +728,92 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.subText,
     marginTop: Spacing.md,
+  },
+  modalRoot: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.sm,
+  },
+  modalTitleWrap: {
+    flex: 1,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  modalHint: {
+    fontSize: 12,
+    color: Colors.subText,
+    marginTop: 2,
+  },
+  modalHeaderSpacer: {
+    width: 22,
+  },
+  modalImage: {
+    flex: 1,
+  },
+  modalBody: {
+    flex: 1,
+  },
+  modalBodyContent: {
+    padding: Spacing.lg,
+    paddingBottom: Spacing.xl,
+  },
+  modalTableScroll: {
+    marginTop: Spacing.sm,
+  },
+  modalBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.card,
+  },
+  shareButton: {
+    flex: 1,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  shareButtonText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButton: {
+    flex: 1,
+    borderRadius: Radius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.primary,
+  },
+  saveButtonText: {
+    color: Colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalCancelButton: {
+    paddingVertical: 12,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+  },
+  modalCancelText: {
+    color: Colors.subText,
+    fontSize: 15,
   },
 });
 
