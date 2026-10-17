@@ -1,3 +1,4 @@
+import { EXPORT_HEADERS } from './export-columns';
 import { formatCents } from './money';
 import { formatRatio, summarize } from './summary';
 import type { LedgerRecord } from './types';
@@ -42,6 +43,7 @@ export function buildReportHtml(records: LedgerRecord[], options: ReportOptions)
         <td class="num">${record.direction === 'income' ? '+' : '-'}${formatCents(record.amountCents)}</td>
         <td>${escapeHtml(record.category)}</td>
         <td>${escapeHtml(record.merchant ?? '')}</td>
+        <td>${escapeHtml(record.platform ?? '')}</td>
         <td>${escapeHtml(record.note ?? '')}</td>
       </tr>`,
     )
@@ -74,15 +76,15 @@ export function buildReportHtml(records: LedgerRecord[], options: ReportOptions)
     <div>收入<strong>¥${formatCents(summary.incomeCents)}</strong></div>
     <div>记录<strong>${summary.count} 笔</strong></div>
   </div>
+  <h2>明细</h2>
+  <table>
+    <thead><tr>${EXPORT_HEADERS.map((header, index) => `<th${index === 2 ? ' class="num"' : ''}>${escapeHtml(header)}</th>`).join('')}</tr></thead>
+    <tbody>${detailRows || '<tr><td colspan="7">无明细记录</td></tr>'}</tbody>
+  </table>
   <h2>分类支出</h2>
   <table>
     <thead><tr><th>分类</th><th class="num">金额</th><th class="num">占比</th></tr></thead>
     <tbody>${categoryRows || '<tr><td colspan="3">无支出记录</td></tr>'}</tbody>
-  </table>
-  <h2>明细</h2>
-  <table>
-    <thead><tr><th>时间</th><th>方向</th><th class="num">金额</th><th>分类</th><th>商户</th><th>备注</th></tr></thead>
-    <tbody>${detailRows}</tbody>
   </table>
 </body>
 </html>`;

@@ -30,6 +30,7 @@ import { formatCents } from '@/lib/money';
 import { buildReportHtml, PDF_MIME } from '@/lib/pdf';
 import { formatRatio, summarize } from '@/lib/summary';
 import type { LedgerRecord } from '@/lib/types';
+import type { MonthlySummary } from '@/lib/summary';
 import { buildWorkbookBase64, XLSX_MIME } from '@/lib/xlsx';
 
 type FormatKey = 'xlsx' | 'csv' | 'pdf' | 'image';
@@ -58,18 +59,19 @@ const FORMATS: FormatOption[] = [
   {
     key: 'pdf',
     label: 'PDF',
-    description: '汇总、分类与全部明细，适合打印',
+    description: '明细表格（与 Excel 同列）+ 汇总统计，适合打印',
     icon: 'document-outline',
   },
   {
     key: 'image',
     label: '图片（PNG）',
-    description: '把下方汇总卡存成图片，适合发聊天',
+    description: '汇总卡与明细表格存成一张图，适合发聊天',
     icon: 'image-outline',
   },
 ];
 
 const PREVIEW_LIMIT = 8;
+const IMAGE_ROW_LIMIT = 60;
 
 function formatStamp(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -87,7 +89,7 @@ export default function ExportScreen() {
   const [monthRecords, setMonthRecords] = useState<LedgerRecord[] | null>(null);
   const [allRecords, setAllRecords] = useState<LedgerRecord[] | null>(null);
   const [busy, setBusy] = useState<FormatKey | null>(null);
-  const cardRef = useRef<View>(null);
+  const snapRef = useRef<View>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -127,6 +129,12 @@ export default function ExportScreen() {
   const customDisabled = scope === 'custom' && selectedIds.length === 0;
   const previewRows =
     records == null ? [] : expandPreview ? records : records.slice(0, PREVIEW_LIMIT);
+  const captureRows =
+    records == null ? [] : records.slice(0, IMAGE_ROW_LIMIT);
+  const imageTailNote =
+    records != null && records.length > IMAGE_ROW_LIMIT
+      ? `其余 ${records.length - IMAGE_ROW_LIMIT} 笔未展示，完整数据可导出 Excel/CSV/PDF`
+      : undefined;
 
   function toggleRecord(id: number) {
     setSelectedIds((prev) =>
@@ -195,7 +203,7 @@ export default function ExportScreen() {
       return;
     }
     void run(key, async () => {
-      const uri = await captureRef(cardRef, { format: 'png', quality: 1, result: 'tmpfile' });
+      const uri = await captureRef(snapRef, { format: 'png', quality: 1, result: 'tmpfile' });
       await shareImageFile(uri, `${fileBase}.png`);
     });
   }
@@ -274,27 +282,8 @@ export default function ExportScreen() {
         </View>
       ) : null}
 
-      <View ref={cardRef} collapsable={false} style={styles.card}>
-        <Text style={styles.cardTitle}>截图记账 · {scopeLabel}</Text>
-        <Text style={styles.cardMeta}>导出时间 {formatStamp(new Date())}</Text>
-        <Text style={styles.cardLabel}>支出</Text>
-        <Text style={styles.cardExpense}>¥{formatCents(summary.expenseCents)}</Text>
-        <Text style={styles.cardMeta}>
-          收入 ¥{formatCents(summary.incomeCents)} · 共 {summary.count} 笔
-        </Text>
-        <View style={styles.cardDivider} />
-        {summary.byCategory.length === 0 ? (
-          <Text style={styles.cardMeta}>这段时间没有支出记录</Text>
-        ) : (
-          summary.byCategory.slice(0, 6).map((stat) => (
-            <View key={stat.category} style={styles.categoryRow}>
-              <View style={[styles.dot, { backgroundColor: categoryColor(stat.category) }]} />
-              <Text style={styles.categoryName}>{stat.category}</Text>
-              <Text style={styles.categoryAmount}>¥{formatCents(stat.cents)}</Text>
-              <Text style={styles.categoryRatio}>{formatRatio(stat.ratio)}</Text>
-            </View>
-          ))
-        )}
+      <View style={styles.card}>
+        <SummaryBlock title={`截图记账 · ${scopeLabel}`} summary={summary} />
       </View>
 
       <Text style={styles.sectionLabel}>明细预览</Text>
@@ -306,45 +295,7 @@ export default function ExportScreen() {
         ) : (
           <>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.tableMin}>
-                <View style={[styles.tableRow, styles.tableHead]}>
-                  {EXPORT_HEADERS.map((header, index) => (
-                    <Text key={header} style={[styles.th, COL_STYLES[index]]}>
-                      {header}
-                    </Text>
-                  ))}
-                </View>
-                {previewRows.map((record) => {
-                  const cells = [
-                    record.txTime.replace('T', ' '),
-                    record.direction === 'income' ? '收入' : '支出',
-                    formatCents(record.amountCents),
-                    record.category,
-                    record.merchant ?? '',
-                    record.platform ?? '',
-                    record.note ?? '',
-                  ];
-                  return (
-                    <View key={record.id} style={styles.tableRow}>
-                      {cells.map((cell, index) => (
-                        <Text
-                          key={EXPORT_HEADERS[index]}
-                          numberOfLines={1}
-                          style={[
-                            styles.td,
-                            COL_STYLES[index],
-                            index === 2 &&
-                              (record.direction === 'income'
-                                ? styles.pickIncome
-                                : styles.pickExpense),
-                          ]}>
-                          {cell}
-                        </Text>
-                      ))}
-                    </View>
-                  );
-                })}
-              </View>
+              <DetailTable rows={previewRows} />
             </ScrollView>
             <Text style={styles.tableCount}>
               共 {records.length} 笔{records.length > PREVIEW_LIMIT && !expandPreview
@@ -383,6 +334,15 @@ export default function ExportScreen() {
       ))}
 
       <Text style={styles.footnote}>导出后走系统分享：微信、邮件、文件管理器都可以。</Text>
+
+      <View ref={snapRef} collapsable={false} style={styles.snapWrap}>
+        <View style={styles.card}>
+          <SummaryBlock title={`截图记账 · ${scopeLabel}`} summary={summary} />
+        </View>
+        <View style={[styles.card, styles.snapTable]}>
+          <DetailTable rows={captureRows} tailNote={imageTailNote} />
+        </View>
+      </View>
     </ScrollView>
   );
 }
@@ -510,6 +470,17 @@ const styles = StyleSheet.create({
     color: Colors.subText,
     marginTop: 8,
   },
+  snapWrap: {
+    position: 'absolute',
+    left: -10000,
+    top: 0,
+    width: 520,
+    padding: Spacing.lg,
+    backgroundColor: Colors.background,
+  },
+  snapTable: {
+    marginTop: Spacing.md,
+  },
   emptyText: {
     fontSize: 13,
     color: Colors.subText,
@@ -614,3 +585,75 @@ const COL_STYLES = [
   styles.colPlat,
   styles.colWide,
 ];
+
+function SummaryBlock({ title, summary }: { title: string; summary: MonthlySummary }) {
+  return (
+    <>
+      <Text style={styles.cardTitle}>{title}</Text>
+      <Text style={styles.cardMeta}>导出时间 {formatStamp(new Date())}</Text>
+      <Text style={styles.cardLabel}>支出</Text>
+      <Text style={styles.cardExpense}>¥{formatCents(summary.expenseCents)}</Text>
+      <Text style={styles.cardMeta}>
+        收入 ¥{formatCents(summary.incomeCents)} · 共 {summary.count} 笔
+      </Text>
+      <View style={styles.cardDivider} />
+      {summary.byCategory.length === 0 ? (
+        <Text style={styles.cardMeta}>这段时间没有支出记录</Text>
+      ) : (
+        summary.byCategory.slice(0, 6).map((stat) => (
+          <View key={stat.category} style={styles.categoryRow}>
+            <View style={[styles.dot, { backgroundColor: categoryColor(stat.category) }]} />
+            <Text style={styles.categoryName}>{stat.category}</Text>
+            <Text style={styles.categoryAmount}>¥{formatCents(stat.cents)}</Text>
+            <Text style={styles.categoryRatio}>{formatRatio(stat.ratio)}</Text>
+          </View>
+        ))
+      )}
+    </>
+  );
+}
+
+function DetailTable({ rows, tailNote }: { rows: LedgerRecord[]; tailNote?: string }) {
+  return (
+    <View style={styles.tableMin}>
+      <View style={[styles.tableRow, styles.tableHead]}>
+        {EXPORT_HEADERS.map((header, index) => (
+          <Text key={header} style={[styles.th, COL_STYLES[index]]}>
+            {header}
+          </Text>
+        ))}
+      </View>
+      {rows.map((record) => {
+        const cells = [
+          record.txTime.replace('T', ' '),
+          record.direction === 'income' ? '收入' : '支出',
+          formatCents(record.amountCents),
+          record.category,
+          record.merchant ?? '',
+          record.platform ?? '',
+          record.note ?? '',
+        ];
+        return (
+          <View key={record.id} style={styles.tableRow}>
+            {cells.map((cell, index) => (
+              <Text
+                key={EXPORT_HEADERS[index]}
+                numberOfLines={1}
+                style={[
+                  styles.td,
+                  COL_STYLES[index],
+                  index === 2 &&
+                    (record.direction === 'income'
+                      ? styles.pickIncome
+                      : styles.pickExpense),
+                ]}>
+                {cell}
+              </Text>
+            ))}
+          </View>
+        );
+      })}
+      {tailNote ? <Text style={styles.tableCount}>{tailNote}</Text> : null}
+    </View>
+  );
+}
