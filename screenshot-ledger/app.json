@@ -2,13 +2,14 @@
   "expo": {
     "name": "截图记账",
     "slug": "screenshot-ledger",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "screenshotledger",
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.utilitysite.screenshotledger",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 
 import type { LedgerRecord } from '../types';
 import { buildWorkbookBase64, exportFileName, XLSX_MIME } from '../xlsx';
+import { customExportBaseName } from '../export-names';
 
 function makeRecord(overrides: Partial<LedgerRecord> = {}): LedgerRecord {
   return {
@@ -65,6 +66,12 @@ describe('exportFileName', () => {
   it('全部导出带当天日期', () => {
     expect(exportFileName(null, new Date(2026, 8, 18))).toBe(
       '截图记账-全部-2026-09-18.xlsx',
+    );
+  });
+
+  it('自选导出带当天日期', () => {
+    expect(customExportBaseName(new Date(2026, 8, 18))).toBe(
+      '截图记账-自选-2026-09-18',
     );
   });
 });

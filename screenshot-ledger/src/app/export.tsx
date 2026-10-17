@@ -24,7 +24,7 @@ import {
   shareImageFile,
   shareTextFile,
 } from '@/lib/export';
-import { exportBaseName } from '@/lib/export-names';
+import { customExportBaseName, exportBaseName } from '@/lib/export-names';
 import { formatCents } from '@/lib/money';
 import { buildReportHtml, PDF_MIME } from '@/lib/pdf';
 import { formatRatio, summarize } from '@/lib/summary';
@@ -32,7 +32,7 @@ import type { LedgerRecord } from '@/lib/types';
 import { buildWorkbookBase64, XLSX_MIME } from '@/lib/xlsx';
 
 type FormatKey = 'xlsx' | 'csv' | 'pdf' | 'image';
-type Scope = 'month' | 'all';
+type Scope = 'month' | 'all' | 'custom';
 
 interface FormatOption {
   key: FormatKey;
@@ -79,6 +79,7 @@ export default function ExportScreen() {
   const params = useLocalSearchParams<{ monthKey?: string }>();
   const monthKey = params.monthKey ?? monthKeyOf(new Date());
   const [scope, setScope] = useState<Scope>('month');
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [monthRecords, setMonthRecords] = useState<LedgerRecord[] | null>(null);
   const [allRecords, setAllRecords] = useState<LedgerRecord[] | null>(null);
   const [busy, setBusy] = useState<FormatKey | null>(null);
@@ -103,14 +104,48 @@ export default function ExportScreen() {
     }, [monthKey]),
   );
 
-  const records = scope === 'month' ? monthRecords : allRecords;
+  const selectedSet = new Set(selectedIds);
+  const selectedRecords =
+    allRecords?.filter((record) => selectedSet.has(record.id)) ?? null;
+  const records =
+    scope === 'month' ? monthRecords : scope === 'all' ? allRecords : selectedRecords;
   const summary = summarize(records ?? []);
-  const scopeLabel = scope === 'month' ? monthLabel(monthKey) : '全部记录';
-  const fileBase = exportBaseName(scope === 'month' ? monthKey : null, new Date());
+  const scopeLabel =
+    scope === 'month'
+      ? monthLabel(monthKey)
+      : scope === 'all'
+        ? '全部记录'
+        : `自选 ${selectedRecords?.length ?? 0} 项`;
+  const fileBase =
+    scope === 'custom'
+      ? customExportBaseName(new Date())
+      : exportBaseName(scope === 'month' ? monthKey : null, new Date());
+  const customDisabled = scope === 'custom' && selectedIds.length === 0;
+
+  function toggleRecord(id: number) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  function selectAll() {
+    setSelectedIds((allRecords ?? []).map((record) => record.id));
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+  }
 
   async function run(key: FormatKey, task: (rows: LedgerRecord[]) => Promise<void>) {
     if (!records || records.length === 0) {
-      Alert.alert('没有可导出的记录', scope === 'month' ? '本月还没有记录。' : '账本还是空的。');
+      Alert.alert(
+        '没有可导出的记录',
+        scope === 'custom'
+          ? '请先在列表里勾选要导出的记录。'
+          : scope === 'month'
+            ? '本月还没有记录。'
+            : '账本还是空的。',
+      );
       return;
     }
     if (!(await canShare())) {
@@ -171,10 +206,67 @@ export default function ExportScreen() {
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Text style={styles.sectionLabel}>导出范围</Text>
       <ChipGroup
-        options={['本月', '全部']}
-        value={scope === 'month' ? '本月' : '全部'}
-        onChange={(value) => setScope(value === '本月' ? 'month' : 'all')}
+        options={['本月', '全部', '自选']}
+        value={scope === 'month' ? '本月' : scope === 'all' ? '全部' : '自选'}
+        onChange={(value) =>
+          setScope(value === '本月' ? 'month' : value === '全部' ? 'all' : 'custom')
+        }
       />
+
+      {scope === 'custom' && allRecords != null ? (
+        <View style={styles.pickBlock}>
+          <View style={styles.pickHeader}>
+            <Text style={styles.pickHeaderLabel}>
+              勾选要导出的记录（已选 {selectedIds.length} 项）
+            </Text>
+            <View style={styles.pickActions}>
+              <Pressable hitSlop={6} onPress={selectAll}>
+                <Text style={styles.pickAction}>全选</Text>
+              </Pressable>
+              <Pressable hitSlop={6} onPress={clearSelection}>
+                <Text style={styles.pickAction}>清空</Text>
+              </Pressable>
+            </View>
+          </View>
+          {allRecords.length === 0 ? (
+            <Text style={styles.emptyText}>账本还是空的。</Text>
+          ) : (
+            allRecords.map((record) => {
+              const checked = selectedSet.has(record.id);
+              return (
+                <Pressable
+                  key={record.id}
+                  style={styles.pickRow}
+                  onPress={() => toggleRecord(record.id)}>
+                  <Ionicons
+                    name={checked ? 'checkbox' : 'square-outline'}
+                    size={20}
+                    color={checked ? Colors.primary : Colors.subText}
+                  />
+                  <View style={styles.pickMain}>
+                    <Text style={styles.pickTitle} numberOfLines={1}>
+                      {record.merchant || record.category}
+                    </Text>
+                    <Text style={styles.pickSub} numberOfLines={1}>
+                      {record.txTime.replace('T', ' ')} · {record.category}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.pickAmount,
+                      record.direction === 'income'
+                        ? styles.pickIncome
+                        : styles.pickExpense,
+                    ]}>
+                    {record.direction === 'income' ? '+' : '-'}¥
+                    {formatCents(record.amountCents)}
+                  </Text>
+                </Pressable>
+              );
+            })
+          )}
+        </View>
+      ) : null}
 
       <View ref={cardRef} collapsable={false} style={styles.card}>
         <Text style={styles.cardTitle}>截图记账 · {scopeLabel}</Text>
@@ -203,8 +295,8 @@ export default function ExportScreen() {
       {FORMATS.map((format) => (
         <Pressable
           key={format.key}
-          style={styles.formatRow}
-          disabled={busy != null}
+          style={[styles.formatRow, customDisabled && styles.formatRowDisabled]}
+          disabled={busy != null || customDisabled}
           onPress={() => handleExport(format.key)}>
           <Ionicons name={format.icon} size={22} color={Colors.primary} />
           <View style={styles.formatMain}>
@@ -244,6 +336,63 @@ const styles = StyleSheet.create({
     color: Colors.subText,
     marginBottom: Spacing.sm,
     marginTop: Spacing.md,
+  },
+  pickBlock: {
+    marginTop: Spacing.md,
+  },
+  pickHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  pickHeaderLabel: {
+    fontSize: 13,
+    color: Colors.subText,
+  },
+  pickActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  pickAction: {
+    fontSize: 13,
+    color: Colors.primary,
+  },
+  pickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  pickMain: {
+    flex: 1,
+    marginHorizontal: Spacing.md,
+  },
+  pickTitle: {
+    fontSize: 14,
+    color: Colors.text,
+  },
+  pickSub: {
+    fontSize: 11,
+    color: Colors.subText,
+    marginTop: 1,
+  },
+  pickAmount: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  pickExpense: {
+    color: Colors.expense,
+  },
+  pickIncome: {
+    color: Colors.income,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: Colors.subText,
   },
   card: {
     backgroundColor: Colors.card,
@@ -312,6 +461,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.lg,
     marginBottom: Spacing.sm,
+  },
+  formatRowDisabled: {
+    opacity: 0.45,
   },
   formatMain: {
     flex: 1,
