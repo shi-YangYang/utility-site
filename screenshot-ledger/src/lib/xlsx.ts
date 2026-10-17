@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 
+import { EXPORT_HEADERS } from './export-columns';
 import { exportBaseName } from './export-names';
 import type { LedgerRecord } from './types';
 
@@ -7,7 +8,6 @@ export const XLSX_MIME =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 const SHEET_NAME = '账目';
-const HEADERS = ['日期时间', '方向', '金额', '分类', '商户', '平台', '备注'];
 const COLUMN_WIDTHS = [18, 8, 10, 8, 20, 10, 30];
 
 function toRow(record: LedgerRecord): (string | number)[] {
@@ -23,7 +23,7 @@ function toRow(record: LedgerRecord): (string | number)[] {
 }
 
 export function buildWorkbookBase64(records: LedgerRecord[]): string {
-  const sheet = XLSX.utils.aoa_to_sheet([HEADERS, ...records.map(toRow)]);
+  const sheet = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...records.map(toRow)]);
   sheet['!cols'] = COLUMN_WIDTHS.map((wch) => ({ wch }));
   records.forEach((_, index) => {
     const cell = sheet[`C${index + 2}`];

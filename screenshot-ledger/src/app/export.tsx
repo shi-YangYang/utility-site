@@ -25,6 +25,7 @@ import {
   shareTextFile,
 } from '@/lib/export';
 import { customExportBaseName, exportBaseName } from '@/lib/export-names';
+import { EXPORT_HEADERS } from '@/lib/export-columns';
 import { formatCents } from '@/lib/money';
 import { buildReportHtml, PDF_MIME } from '@/lib/pdf';
 import { formatRatio, summarize } from '@/lib/summary';
@@ -68,6 +69,8 @@ const FORMATS: FormatOption[] = [
   },
 ];
 
+const PREVIEW_LIMIT = 8;
+
 function formatStamp(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
@@ -80,6 +83,7 @@ export default function ExportScreen() {
   const monthKey = params.monthKey ?? monthKeyOf(new Date());
   const [scope, setScope] = useState<Scope>('month');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [expandPreview, setExpandPreview] = useState(false);
   const [monthRecords, setMonthRecords] = useState<LedgerRecord[] | null>(null);
   const [allRecords, setAllRecords] = useState<LedgerRecord[] | null>(null);
   const [busy, setBusy] = useState<FormatKey | null>(null);
@@ -121,6 +125,8 @@ export default function ExportScreen() {
       ? customExportBaseName(new Date())
       : exportBaseName(scope === 'month' ? monthKey : null, new Date());
   const customDisabled = scope === 'custom' && selectedIds.length === 0;
+  const previewRows =
+    records == null ? [] : expandPreview ? records : records.slice(0, PREVIEW_LIMIT);
 
   function toggleRecord(id: number) {
     setSelectedIds((prev) =>
@@ -291,6 +297,71 @@ export default function ExportScreen() {
         )}
       </View>
 
+      <Text style={styles.sectionLabel}>明细预览</Text>
+      <View style={styles.card}>
+        {records.length === 0 ? (
+          <Text style={styles.emptyText}>
+            {scope === 'custom' ? '勾选记录后会在这里预览。' : '没有可导出的记录。'}
+          </Text>
+        ) : (
+          <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.tableMin}>
+                <View style={[styles.tableRow, styles.tableHead]}>
+                  {EXPORT_HEADERS.map((header, index) => (
+                    <Text key={header} style={[styles.th, COL_STYLES[index]]}>
+                      {header}
+                    </Text>
+                  ))}
+                </View>
+                {previewRows.map((record) => {
+                  const cells = [
+                    record.txTime.replace('T', ' '),
+                    record.direction === 'income' ? '收入' : '支出',
+                    formatCents(record.amountCents),
+                    record.category,
+                    record.merchant ?? '',
+                    record.platform ?? '',
+                    record.note ?? '',
+                  ];
+                  return (
+                    <View key={record.id} style={styles.tableRow}>
+                      {cells.map((cell, index) => (
+                        <Text
+                          key={EXPORT_HEADERS[index]}
+                          numberOfLines={1}
+                          style={[
+                            styles.td,
+                            COL_STYLES[index],
+                            index === 2 &&
+                              (record.direction === 'income'
+                                ? styles.pickIncome
+                                : styles.pickExpense),
+                          ]}>
+                          {cell}
+                        </Text>
+                      ))}
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <Text style={styles.tableCount}>
+              共 {records.length} 笔{records.length > PREVIEW_LIMIT && !expandPreview
+                ? '，仅展示前 8 条'
+                : ''}
+            </Text>
+            {records.length > PREVIEW_LIMIT ? (
+              <Pressable hitSlop={6} onPress={() => setExpandPreview((value) => !value)}>
+                <Text style={styles.pickAction}>
+                  {expandPreview ? '收起' : '展开全部'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </>
+        )}
+      </View>
+
       <Text style={styles.sectionLabel}>导出格式</Text>
       {FORMATS.map((format) => (
         <Pressable
@@ -390,6 +461,55 @@ const styles = StyleSheet.create({
   pickIncome: {
     color: Colors.income,
   },
+  tableMin: {
+    minWidth: 480,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  tableHead: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+    paddingBottom: 6,
+    marginBottom: 2,
+  },
+  th: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.subText,
+  },
+  td: {
+    fontSize: 11,
+    color: Colors.text,
+  },
+  colTime: {
+    width: 96,
+  },
+  colDir: {
+    width: 34,
+  },
+  colAmount: {
+    width: 52,
+    textAlign: 'right',
+    marginRight: 12,
+  },
+  colCat: {
+    width: 48,
+  },
+  colWide: {
+    flex: 1,
+    minWidth: 56,
+  },
+  colPlat: {
+    width: 40,
+  },
+  tableCount: {
+    fontSize: 11,
+    color: Colors.subText,
+    marginTop: 8,
+  },
   emptyText: {
     fontSize: 13,
     color: Colors.subText,
@@ -484,3 +604,13 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
   },
 });
+
+const COL_STYLES = [
+  styles.colTime,
+  styles.colDir,
+  styles.colAmount,
+  styles.colCat,
+  styles.colWide,
+  styles.colPlat,
+  styles.colWide,
+];
