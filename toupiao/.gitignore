@@ -1,0 +1,14 @@
+# 本项目单独一份 .gitignore 的原因（根规范 5.1）：
+# 以下规则只对 toupiao 成立，写进根 .gitignore 会变成全站规则、可能误伤其他子项目。
+# 通用规则（node_modules/、dist/、.env、.DS_Store 等）仍由根 .gitignore 负责。
+
+# 20 张 Logo 候选图：用户明确要求不入库（2026-11-04）。
+# 本地开发与 Docker 通过 ICONS_DIR / 只读卷使用；部署到新机器时手工上传。
+# 目录里的 README.md 仍然入库，保证目录结构与说明在仓库中可见。
+/assets/icons/*.png
+
+# 运行时 SQLite 与上传临时文件
+/data/
+
+# E2E 截图与下载产物
+/e2e/artifacts/

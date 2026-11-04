@@ -69,3 +69,28 @@ jobs:
           npm ci
           npx tsc --noEmit
           npm test -- --ci
+
+      - name: 准备 Node（toupiao 校验用）
+        if: contains(steps.changed.outputs.projects, 'toupiao')
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: 校验 toupiao（构建 + 接口测试）
+        if: contains(steps.changed.outputs.projects, 'toupiao')
+        working-directory: toupiao
+        run: |
+          set -eu
+          npm ci
+          npm run build
+          npm test
+
+      - name: 校验 toupiao 的 compose 与镜像
+        if: contains(steps.changed.outputs.projects, 'toupiao')
+        working-directory: toupiao
+        run: |
+          set -eu
+          cp .env.example .env
+          docker compose -f docker-compose.yml config --quiet
+          rm .env
+          docker build -t toupiao:ci .

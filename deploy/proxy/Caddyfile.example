@@ -55,3 +55,15 @@ https://192.168.1.10 {
 # 	}
 # 	# 后续子项目继续追加 handle_path 块
 # }
+
+# ============ 用法 2b：toupiao（Logo 投票）============
+# 真实钉钉扫码登录要求 HTTPS 域名（钉钉回调通常不接受 IP），
+# 且站点地址必须与 toupiao/.env 的 PUBLIC_BASE_URL 完全一致。
+# 端口 3100 已在 ../ports.md 登记；若用独立域名走 443，则不需要 3100。
+#
+# vote.example.com {
+# 	reverse_proxy host.docker.internal:3001
+# }
+#
+# 若暂时只有 IP，可用 3100 + tls internal 演示页面，
+# 但钉钉真实登录仍需域名，演示阶段请用 AUTH_MODE=mock。
