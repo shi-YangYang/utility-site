@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import AppHeader from '../components/AppHeader.vue';
 import IconCard from '../components/IconCard.vue';
 import Leaderboard from '../components/Leaderboard.vue';
@@ -22,6 +22,29 @@ const initialLoading = ref(true);
 const loadError = ref('');
 const loginOpen = ref(false);
 const pendingIds = ref(new Set());
+const highlightedId = ref('');
+let highlightTimer = null;
+
+onUnmounted(() => {
+  if (highlightTimer) clearTimeout(highlightTimer);
+});
+
+/**
+ * 从实时排行定位到候选卡：滚动到视口中间并短暂高亮。
+ * 重复点击同一项会重置计时。
+ */
+function focusIcon(id) {
+  const card = document.querySelector(`[data-icon-id="${id}"]`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.querySelector('.icon-button')?.focus({ preventScroll: true });
+  highlightedId.value = id;
+  if (highlightTimer) clearTimeout(highlightTimer);
+  highlightTimer = setTimeout(() => {
+    highlightedId.value = '';
+    highlightTimer = null;
+  }, 1800);
+}
 
 const limitReached = computed(
   () => Boolean(state.value) && state.value.myVotes.length >= state.value.maxVotes,
@@ -208,6 +231,7 @@ async function handleLogout() {
                   :voting-open="state.votingOpen"
                   :limit-reached="limitReached"
                   :max-count="maxCount"
+                  :highlighted="highlightedId === icon.id"
                   @toggle="toggleIcon"
                 />
               </div>
@@ -224,7 +248,7 @@ async function handleLogout() {
               @cancel="toggleIcon"
               @login="openLogin"
             />
-            <Leaderboard :icons="state.icons" />
+            <Leaderboard :icons="state.icons" @focus="focusIcon" />
           </aside>
         </div>
       </template>

@@ -506,6 +506,26 @@ async function main() {
     await expectNoHorizontalScroll(page, '1440px 前台');
     await page.screenshot({ path: join(ARTIFACTS, 'vote-desktop.png'), fullPage: true });
 
+    step('B2 点击实时排行定位并高亮候选卡');
+    await page.getByRole('button', { name: '查看全部' }).click();
+    const lastRankRow = page.locator('.rank-row').last();
+    const targetId = await lastRankRow.getAttribute('data-icon-id');
+    await lastRankRow.click();
+    const highlightedCard = page.locator('.icon-card.is-highlighted');
+    await highlightedCard.waitFor();
+    await page.waitForTimeout(700);
+    const focusInfo = await page.evaluate((id) => {
+      const card = document.querySelector(`.icon-card.is-highlighted[data-icon-id="${id}"]`);
+      if (!card) return null;
+      const box = card.getBoundingClientRect();
+      return { top: box.top, bottom: box.bottom, viewport: window.innerHeight };
+    }, targetId);
+    assert.ok(focusInfo, '应高亮目标候选卡');
+    assert.ok(focusInfo.top >= 0 && focusInfo.bottom <= focusInfo.viewport + 1, '目标卡应滚动到视口内');
+    await page.waitForFunction(() => !document.querySelector('.icon-card.is-highlighted'), null, {
+      timeout: 4000,
+    });
+
     step('D1 375px 移动端两列、无横向滚动');
     await page.setViewportSize({ width: 375, height: 812 });
     await page.reload({ waitUntil: 'domcontentloaded' });

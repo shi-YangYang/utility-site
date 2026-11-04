@@ -8,6 +8,7 @@ const props = defineProps({
   votingOpen: { type: Boolean, default: true },
   limitReached: { type: Boolean, default: false },
   maxCount: { type: Number, default: 0 },
+  highlighted: { type: Boolean, default: false },
 });
 
 defineEmits(['toggle']);
@@ -53,6 +54,7 @@ const ariaLabel = computed(() => {
       'is-selected': selected,
       'is-blocked': blocked,
       'is-pending': pending,
+      'is-highlighted': highlighted,
     }"
     :data-icon-id="icon.id"
   >

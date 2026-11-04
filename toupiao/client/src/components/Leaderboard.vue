@@ -5,6 +5,8 @@ const props = defineProps({
   icons: { type: Array, default: () => [] },
 });
 
+const emit = defineEmits(['focus']);
+
 const expanded = ref(false);
 
 const sorted = computed(() =>
@@ -41,13 +43,21 @@ function barWidth(icon) {
 
     <ol v-else class="rank-list">
       <li v-for="icon in visible" :key="icon.id">
-        <span class="rank-num" aria-hidden="true">{{ icon.count > 0 ? icon.rank : '–' }}</span>
-        <img :src="icon.url" :alt="icon.name" loading="lazy" />
-        <span class="rank-name">{{ icon.name }}</span>
-        <span class="rank-count">{{ icon.count }} 票</span>
-        <span class="rank-bar" aria-hidden="true">
-          <span :style="{ width: barWidth(icon) }"></span>
-        </span>
+        <button
+          type="button"
+          class="rank-row"
+          :data-icon-id="icon.id"
+          :aria-label="`定位到「${icon.name}」的候选卡`"
+          @click="emit('focus', icon.id)"
+        >
+          <span class="rank-num" aria-hidden="true">{{ icon.count > 0 ? icon.rank : '–' }}</span>
+          <img :src="icon.url" :alt="icon.name" loading="lazy" />
+          <span class="rank-name">{{ icon.name }}</span>
+          <span class="rank-count">{{ icon.count }} 票</span>
+          <span class="rank-bar" aria-hidden="true">
+            <span :style="{ width: barWidth(icon) }"></span>
+          </span>
+        </button>
       </li>
     </ol>
   </section>
