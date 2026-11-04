@@ -10,8 +10,9 @@
 - **已提供**：端口分配表（[`ports.md`](./ports.md)）、部署脚本
   （[`scripts/deploy.sh`](./scripts/deploy.sh)）、反向代理 compose 与
   Caddyfile 模板（[`proxy/`](./proxy/)）。
-- **待定**：服务器地址与域名、是否启用 HTTPS 与证书来源
-  （见根 `AGENTS.md`「全站待定」）。模板使用占位域名，未配置前不会签发证书。
+- **已定（2026-11-04）**：一台腾讯云 Ubuntu 26.04 服务器（`106.54.224.173`）；
+  `toupiao` 已通过共享 Caddy 的 `443` + Let's Encrypt **IP 证书**上线
+  （6 天短周期，服务器 systemd timer 自动续期）。域名仍未确定。
 
 ## 怎么用
 

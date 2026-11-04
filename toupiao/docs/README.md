@@ -21,8 +21,9 @@
 3. 在“登录与分享 / 登录”中配置**登录回调地址**。这个地址由本站后台生成：
    部署完成后登录 `/admin` → 「钉钉登录」→ 复制“回调地址”，形如
    `https://<你的域名>/api/auth/callback`。
-   - 必须与后台面板显示的地址**逐字符一致**（协议、域名、路径）。
-   - 钉钉通常要求 HTTPS 与已备案域名；IP 地址一般不可用。
+   - 必须与后台面板显示的地址**逐字符一致**（协议、域名/IP、路径）。
+   - 钉钉要求 HTTPS；2026 年起 Let's Encrypt 支持**纯 IP 证书**（6 天），
+     没有域名也可以完成回调；有域名仍更稳妥。
 4. 如需限定企业，填 `corpId`；不填则允许扫码用户登录。
 5. 权限：读取用户基本信息（昵称、头像、unionId）。本项目只用这三项。
 
@@ -126,9 +127,36 @@ https://vote.example.com {
 ```
 
 - 有域名：Caddy 自动签发证书；域名解析到服务器，80/443 可达。
-- 只有内网 IP：Caddy 自签证书可以起 HTTPS，但**钉钉回调通常不接受 IP**，
-  真实登录仍需要域名。
+- 只有 IP：可以用 **Let's Encrypt IP 证书**（2026-01 起 GA，有效期 6 天，
+  必须使用 `shortlived` profile；自签证书只适合临时调试）。
+  当前生产部署即采用这种方式，证书路径
+  `/etc/letsencrypt/live/<IP>/fullchain.pem` 与 `privkey.pem`。
 - 改完代理后执行 `./deploy/scripts/deploy.sh proxy`。
+
+### 纯 IP + Let's Encrypt 参考命令
+
+Certbot 需要 **5.4+**（`--ip-address` 参数）。Caddy 在 80 端口提供
+`/.well-known/acme-challenge/`，HTTPS 可先用 `tls internal` 启动：
+
+```bash
+# 1) 首次签发（webroot；把 <IP> 换成实际公网 IP）
+sudo docker run --rm \
+  -v /etc/letsencrypt:/etc/letsencrypt \
+  -v /var/lib/letsencrypt:/var/lib/letsencrypt \
+  -v /srv/utility-site/deploy/proxy/acme:/var/www/certbot \
+  certbot/certbot certonly --webroot -w /var/www/certbot \
+  --ip-address <IP> --preferred-profile shortlived \
+  --register-unsafely-without-email --agree-tos --non-interactive
+
+# 2) Caddy 使用证书
+# tls /etc/letsencrypt/live/<IP>/fullchain.pem /etc/letsencrypt/live/<IP>/privkey.pem
+```
+
+- Caddyfile 需要 `auto_https disable_redirects`，并显式在 80 端口放行
+  `/.well-known/acme-challenge/*`，其余 HTTP 请求再 308 跳 HTTPS。
+- 6 天证书必须自动续期：定时执行 `certbot renew` 后重启/重载 Caddy。
+  本项目在服务器上用 systemd timer（每日一次）执行这个流程。
+- 续期验证：`certbot renew --dry-run` 应成功。
 
 后台保存的站点地址必须是**对外 HTTPS 地址**（不是 `http://IP:3001`），否则回调地址拼错。
 

@@ -9,7 +9,7 @@
 |---|---|---|
 | [recording](./recording/) | 公司内部语音样本采集：网页录中英文两段并上传，管理员查看提交、试听与下载 | MVP 已完成 |
 | [screenshot-ledger](./screenshot-ledger/) | Android 截图记账：LLM 识别京东/淘宝/拼多多等付款截图，一键记账、按月汇总 | 待批量复测与 APK 构建 |
-| [toupiao](./toupiao/) | Esonitro Logo 评选：钉钉登录（后台可配），每人最多投 5 票，实时排名，后台明细与导出 | MVP 已完成（独立验收 PASS；真实钉钉待域名） |
+| [toupiao](./toupiao/) | Esonitro Logo 评选：钉钉登录（后台可配），每人最多投 5 票，实时排名，后台明细与导出 | 已部署（IP HTTPS，Let's Encrypt）；钉钉登录待扫码验证 |
 | [deploy](./deploy/) | 全站部署与运维：反向代理、端口分配表、部署脚本与 CI/CD（非业务工具） | 已就位 |
 
 ## 用法
