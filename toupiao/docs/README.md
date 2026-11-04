@@ -84,6 +84,22 @@ docker compose logs -f
 - 后台把 AppKey/corpId/站点地址留空保存会删除数据库值并回退到 `.env` 引导值；AppSecret 留空表示保留原密文；首次配置且无环境变量引导值时必须提供 AppSecret。
 - 未配置钉钉时员工点登录会提示“登录暂未开放”，管理员仍可正常使用后台。
 
+### 本地调试（localhost）
+
+钉钉允许把 `http://localhost:<port>` 作为本地调试回调，但**不要省略端口**：
+
+- `npm run dev` 时站点地址填 `http://localhost:5173`
+  （不是 `http://127.0.0.1`；后者默认 80 端口，站点并不在 80）。
+- 钉钉后台的“重定向 URL / 回调域名”要加 `http://localhost:5173`；
+  若该字段要求完整地址，则填 `http://localhost:5173/api/auth/callback`，
+  与后台面板显示的“回调地址”逐字符一致。
+- 浏览器也用 `http://localhost:5173` 打开；回调会经 Vite 的 `/api` 代理到 `3001`，
+  不需要额外开端口。
+- 改完钉钉后台后按控制台要求保存/发布应用，再重新点「使用钉钉登录」。
+
+如果钉钉后台不接受 `localhost`，用 cloudflared / ngrok 之类把 5173 映射到一个 HTTPS
+地址，把站点地址改成该 HTTPS 地址，并把对应回调填进钉钉后台即可。
+
 ## 5. 反向代理与 HTTPS
 
 在 `deploy/proxy/Caddyfile` 增加（先确认 3100 已在 `ports.md` 登记，
