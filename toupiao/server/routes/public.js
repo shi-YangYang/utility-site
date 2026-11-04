@@ -19,6 +19,7 @@ export async function state(ctx) {
       iconStore: ctx.iconStore,
       config: ctx.config,
       session,
+      logger: ctx.logger,
     }),
   );
 }

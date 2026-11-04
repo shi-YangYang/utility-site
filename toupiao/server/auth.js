@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   HttpError,
   appendSetCookie,
@@ -15,9 +14,8 @@ export const USER_COOKIE = 'toupiao_session';
 export const ADMIN_COOKIE = 'toupiao_admin';
 export const OAUTH_STATE_COOKIE = 'toupiao_oauth_state';
 
-export const DINGTALK_AUTHORIZE_URL = 'https://login.dingtalk.com/oauth2/auth';
-export const DINGTALK_TOKEN_URL = 'https://api.dingtalk.com/v1.0/oauth2/userAccessToken';
-export const DINGTALK_USERINFO_URL = 'https://api.dingtalk.com/v1.0/contact/users/me';
+export const DINGTALK_AUTHORIZE_BASE = 'https://login.dingtalk.com';
+export const DINGTALK_API_BASE = 'https://api.dingtalk.com';
 
 export class DingTalkError extends Error {
   constructor(code, message) {
@@ -127,20 +125,43 @@ export function clearOAuthStateCookie(res, req, config) {
 
 // ---------- 钉钉 OAuth2 ----------
 
-export function callbackUrl(config) {
-  return `${config.publicBaseUrl}/api/auth/callback`;
+/** 测试环境可用 DINGTALK_TEST_BASE 指向本地假钉钉服务；生产环境忽略。 */
+export function dingtalkEndpoints(config) {
+  if (config.dingtalkTestBase) {
+    return {
+      authorize: `${config.dingtalkTestBase}/oauth2/auth`,
+      token: `${config.dingtalkTestBase}/v1.0/oauth2/userAccessToken`,
+      userinfo: `${config.dingtalkTestBase}/v1.0/contact/users/me`,
+    };
+  }
+  return {
+    authorize: `${DINGTALK_AUTHORIZE_BASE}/oauth2/auth`,
+    token: `${DINGTALK_API_BASE}/v1.0/oauth2/userAccessToken`,
+    userinfo: `${DINGTALK_API_BASE}/v1.0/contact/users/me`,
+  };
 }
 
-export function buildAuthorizeUrl(config, state) {
-  const url = new URL(DINGTALK_AUTHORIZE_URL);
-  url.searchParams.set('redirect_uri', callbackUrl(config));
+export function callbackUrl(publicBaseUrl) {
+  return `${String(publicBaseUrl ?? '').replace(/\/+$/, '')}/api/auth/callback`;
+}
+
+export function buildAuthorizeUrl(settings, state, config) {
+  const url = new URL(dingtalkEndpoints(config).authorize);
+  url.searchParams.set(
+    'redirect_uri',
+    settings.callbackUrl || callbackUrl(settings.publicBaseUrl),
+  );
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('client_id', config.dingtalk.appKey);
+  url.searchParams.set('client_id', settings.appKey);
   url.searchParams.set('scope', 'openid');
   url.searchParams.set('state', state);
   url.searchParams.set('prompt', 'consent');
-  if (config.dingtalk.corpId) url.searchParams.set('corpId', config.dingtalk.corpId);
+  if (settings.corpId) url.searchParams.set('corpId', settings.corpId);
   return url.toString();
+}
+
+export function createOAuthState() {
+  return randomToken(24);
 }
 
 async function parseJsonResponse(response) {
@@ -151,15 +172,15 @@ async function parseJsonResponse(response) {
   }
 }
 
-export async function exchangeCodeForToken({ config, code, fetchImpl = globalThis.fetch }) {
+export async function exchangeCodeForToken({ config, settings, code, fetchImpl = globalThis.fetch }) {
   let response;
   try {
-    response = await fetchImpl(DINGTALK_TOKEN_URL, {
+    response = await fetchImpl(dingtalkEndpoints(config).token, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        clientId: config.dingtalk.appKey,
-        clientSecret: config.dingtalk.appSecret,
+        clientId: settings.appKey,
+        clientSecret: settings.appSecret,
         code,
         grantType: 'authorization_code',
       }),
@@ -177,10 +198,10 @@ export async function exchangeCodeForToken({ config, code, fetchImpl = globalThi
   return data.accessToken;
 }
 
-export async function fetchDingTalkUser({ accessToken, fetchImpl = globalThis.fetch }) {
+export async function fetchDingTalkUser({ config, accessToken, fetchImpl = globalThis.fetch }) {
   let response;
   try {
-    response = await fetchImpl(DINGTALK_USERINFO_URL, {
+    response = await fetchImpl(dingtalkEndpoints(config).userinfo, {
       method: 'GET',
       headers: { 'x-acs-dingtalk-access-token': accessToken },
     });
@@ -200,25 +221,6 @@ export async function fetchDingTalkUser({ accessToken, fetchImpl = globalThis.fe
     nick: typeof data.nick === 'string' && data.nick.trim() ? data.nick.trim() : '钉钉用户',
     avatarUrl: typeof data.avatarUrl === 'string' ? data.avatarUrl : '',
   };
-}
-
-// ---------- mock ----------
-
-export function normalizeMockName(raw) {
-  if (typeof raw !== 'string') return null;
-  const name = raw.trim();
-  if (name.length < 1 || name.length > 20) return null;
-  if (/[\u0000-\u001f\u007f]/.test(name)) return null;
-  return name;
-}
-
-/** 以姓名生成稳定假 unionId：同名视为同一用户，重新登录不会产生新用户。 */
-export function mockUnionId(name) {
-  return `mock_${createHash('sha256').update(name, 'utf8').digest('hex').slice(0, 40)}`;
-}
-
-export function createMockState() {
-  return randomToken(24);
 }
 
 // ---------- 鉴权守卫 ----------

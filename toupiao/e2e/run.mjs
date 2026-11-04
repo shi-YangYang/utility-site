@@ -1,23 +1,38 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { startFakeDingTalk } from './fake-dingtalk.mjs';
 
 /**
  * Playwright-core 端到端验收（使用系统 Chrome，不下载浏览器）。
- * 流程：mock 登录 → 投 5 票 → 第 6 票被拒 → 取消 → 改投 → 刷新保持 →
- *      后台登录 → 看明细 → 关闭投票 → 前台冻结 → 重新开启 → 导出 CSV → 重置。
+ *
+ * 流程：后台配置钉钉登录 → 假钉钉 OAuth2 跳转/回调 → 登录 → 投 5 票 →
+ *      第 6 票被拒 → 取消 → 改投 → 刷新保持 → 后台明细 → 关闭/重开 →
+ *      CSV → 重置 → UI 清理与安全自查。
  */
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARTIFACTS = join(ROOT, 'e2e', 'artifacts');
 const ICONS_DIR = join(ROOT, 'assets', 'icons');
 const E2E_ADMIN_PASSWORD = 'e2e-admin-123';
+const E2E_APP_KEY = 'e2e-app-key';
+const E2E_APP_SECRET = 'e2e-app-secret';
+const E2E_CORP_ID = 'e2e-corp';
 
 const steps = [];
 
@@ -78,6 +93,17 @@ async function expectAdminTotal(page, expected) {
   );
 }
 
+async function expectNoHorizontalScroll(page, label) {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  assert.ok(overflow <= 1, `${label} 不应横向滚动（超出 ${overflow}px）`);
+}
+
+async function normalizedText(locator) {
+  return (await locator.innerText()).replace(/\s+/g, ' ').trim();
+}
+
 async function main() {
   if (!existsSync(ICONS_DIR)) {
     throw new Error(`图标目录不存在：${ICONS_DIR}`);
@@ -97,24 +123,29 @@ async function main() {
   );
   if (build.status !== 0) throw new Error('前端构建失败');
 
+  const fake = await startFakeDingTalk();
   const dataDir = mkdtempSync(join(tmpdir(), 'toupiao-e2e-'));
   const port = await getFreePort();
   const base = `http://127.0.0.1:${port}`;
-  const serverLog = createWriteStream(join(ARTIFACTS, 'server.log'), { flags: 'w' });
+  const serverLogPath = join(ARTIFACTS, 'server.log');
+  const serverLog = createWriteStream(serverLogPath, { flags: 'w' });
   const server = spawn(process.execPath, ['server/index.js'], {
     cwd: ROOT,
     env: {
       ...process.env,
       ENV_FILE: join(dataDir, 'missing.env'),
-      AUTH_MODE: 'mock',
+      AUTH_MODE: '',
+      DINGTALK_APP_KEY: '',
+      DINGTALK_APP_SECRET: '',
+      DINGTALK_CORP_ID: '',
+      PUBLIC_BASE_URL: '',
+      DINGTALK_TEST_BASE: fake.base,
       ADMIN_PASSWORD: E2E_ADMIN_PASSWORD,
       SESSION_SECRET: `e2e-session-secret-${'x'.repeat(40)}`,
-      PUBLIC_BASE_URL: base,
       DATA_DIR: dataDir,
       ICONS_DIR,
       PORT: String(port),
-      HOST: '127.0.0.1',
-      NODE_ENV: 'production',
+      NODE_ENV: 'test',
       TRUST_PROXY: '0',
       COOKIE_SECURE: 'false',
     },
@@ -124,7 +155,7 @@ async function main() {
   server.stderr.pipe(serverLog);
 
   let browser;
-  const userContexts = [];
+  let dingtalkSaved = false;
   try {
     step('等待服务 healthy');
     await waitForHealth(base);
@@ -137,11 +168,10 @@ async function main() {
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN',
     });
-    userContexts.push(userContext);
     const page = await userContext.newPage();
     page.setDefaultTimeout(15000);
 
-    step('A1 未登录浏览 20 个图标与实时票数');
+    step('A1 未登录浏览 20 个图标与实时票数，状态栏/hero 无重复入口');
     await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
     await page.locator('.icon-grid .icon-card').first().waitFor();
     assert.equal(await page.locator('.icon-grid .icon-card').count(), pngCount);
@@ -151,18 +181,158 @@ async function main() {
       return Boolean(image && image.complete && image.naturalWidth > 0);
     });
     assert.equal((await page.locator('[data-testid="total-votes"]').innerText()).trim(), '0');
+    assert.equal((await page.locator('[data-testid="voters-count"]').innerText()).trim(), '0');
+    assert.equal(await page.locator('.hero-stats .hero-stat').count(), 2, 'hero 只保留总票数/参与人数');
+    assert.equal(await page.locator('.hero').getByText('我的票数').count(), 0);
+    const initialStatusBar = await normalizedText(page.locator('.status-bar'));
+    assert.ok(initialStatusBar.includes('已投'), '状态栏应保留已投 X/5');
+    assert.equal(initialStatusBar.includes('剩余'), false, '状态栏不应再有“剩余 X 票”');
+    assert.equal(initialStatusBar.includes('登录后投票'), false, '状态栏不应再有登录入口');
+    const initialPublicState = await page.evaluate(async () => (await fetch('/api/state')).json());
+    assert.equal(initialPublicState.loginConfigured, false);
+    assert.equal('authMode' in initialPublicState, false);
 
-    step('A3 未登录点投票 → 登录弹窗');
+    step('A2 未配置钉钉时点登录 → 登录暂未开放');
+    await clickIcon(page, '01');
+    await page.locator('.toast', { hasText: '登录暂未开放' }).waitFor();
+    assert.equal(await page.locator('.login-dialog').count(), 0, '未配置时不应弹出登录框');
+    await dismissToasts(page);
+
+    step('A1 POST /api/auth/mock 已删除（404）');
+    const mockStatus = await page.evaluate(async () => {
+      const response = await fetch('/api/auth/mock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: '旧 mock 用户' }),
+      });
+      return response.status;
+    });
+    assert.equal(mockStatus, 404);
+
+    step('C1 后台登录（错误口令 + 正确口令）');
+    const adminContext = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      locale: 'zh-CN',
+      permissions: ['clipboard-read', 'clipboard-write'],
+    });
+    const adminPage = await adminContext.newPage();
+    adminPage.setDefaultTimeout(15000);
+    await adminPage.goto(`${base}/admin`, { waitUntil: 'domcontentloaded' });
+    await adminPage.locator('#admin-password').waitFor();
+    await adminPage.fill('#admin-password', 'wrong-password');
+    await adminPage.getByRole('button', { name: '进入后台' }).click();
+    await adminPage.locator('.form-error').waitFor();
+    assert.match(await adminPage.locator('.form-error').innerText(), /不正确/);
+    await adminPage.fill('#admin-password', E2E_ADMIN_PASSWORD);
+    await adminPage.getByRole('button', { name: '进入后台' }).click();
+    await adminPage.getByRole('heading', { name: '投票管理' }).waitFor();
+    await adminPage.locator('[data-testid="admin-total-votes"]').waitFor();
+    await expectAdminTotal(adminPage, 0);
+    assert.equal(
+      (await normalizedText(adminPage.locator('[data-testid="dingtalk-status"]'))).includes(
+        '未配置',
+      ),
+      true,
+    );
+    assert.equal(
+      (await normalizedText(adminPage.locator('.control-panel .status-pill'))).includes('进行中'),
+      true,
+      '管理端投票开关面板应有状态 pill',
+    );
+
+    step('F6 后台填写钉钉配置并保存');
+    await adminPage.locator('#dingtalk-base-url').waitFor();
+    await adminPage.fill('#dingtalk-base-url', base);
+    await adminPage.fill('#dingtalk-app-key', E2E_APP_KEY);
+    await adminPage.fill('#dingtalk-app-secret', E2E_APP_SECRET);
+    await adminPage.fill('#dingtalk-corp-id', E2E_CORP_ID);
+    assert.equal(
+      await adminPage.locator('#dingtalk-callback').inputValue(),
+      `${base}/api/auth/callback`,
+      '回调地址应由站点地址生成',
+    );
+    await adminPage.getByRole('button', { name: '保存配置' }).click();
+    await adminPage.locator('[data-testid="dingtalk-result"]', { hasText: '已保存' }).waitFor();
+    await adminPage.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="dingtalk-status"]')?.textContent.trim() === '已配置',
+    );
+    assert.equal(
+      await adminPage.locator('#dingtalk-app-secret').inputValue(),
+      '',
+      '保存后 AppSecret 输入框应为空',
+    );
+    assert.equal(
+      await adminPage.locator('#dingtalk-app-secret').getAttribute('placeholder'),
+      '已保存，留空不修改',
+    );
+    assert.equal(
+      await adminPage.locator('#dingtalk-callback').inputValue(),
+      `${base}/api/auth/callback`,
+    );
+    assert.notEqual(
+      await adminPage.locator('#dingtalk-callback').getAttribute('readonly'),
+      null,
+      '回调地址必须是只读输入框',
+    );
+    await adminPage.getByRole('button', { name: '复制' }).click();
+    await adminPage.getByRole('button', { name: '已复制' }).waitFor();
+    assert.equal(
+      await adminPage.evaluate(() => navigator.clipboard.readText()),
+      `${base}/api/auth/callback`,
+      '复制按钮应写入回调地址',
+    );
+    const adminConfig = await adminPage.evaluate(async () =>
+      (await fetch('/api/admin/dingtalk')).json(),
+    );
+    assert.equal(adminConfig.configured, true);
+    assert.equal(adminConfig.hasSecret, true);
+    assert.equal(JSON.stringify(adminConfig).includes(E2E_APP_SECRET), false);
+    assert.equal((await adminPage.content()).includes(E2E_APP_SECRET), false, 'DOM 不能包含 AppSecret');
+    await adminPage.screenshot({ path: join(ARTIFACTS, 'admin-dingtalk-config.png'), fullPage: true });
+    dingtalkSaved = true;
+
+    step('退出后台');
+    await adminPage.locator('.header-actions').getByRole('button', { name: '退出后台' }).click();
+    await adminPage.locator('#admin-password').waitFor();
+
+    step('F5 前台点登录 → 假钉钉授权 → 回调 → 登录成功');
+    await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
+    await page.locator('.icon-grid .icon-card').first().waitFor();
     await clickIcon(page, '01');
     await page.locator('.login-dialog').waitFor();
-    await page.locator('#mock-name').waitFor();
-    await page.screenshot({ path: join(ARTIFACTS, 'login-dialog.png'), fullPage: true });
-
-    step('A3 mock 输入姓名登录');
-    await page.fill('#mock-name', 'E2E 测试员');
-    await page.getByRole('button', { name: '进入投票' }).click();
-    await page.locator('.login-dialog').waitFor({ state: 'detached' });
-    await page.locator('.user-name', { hasText: 'E2E 测试员' }).waitFor();
+    assert.equal(await page.locator('#mock-name').count(), 0, '登录弹窗不应再有 mock 姓名表单');
+    assert.equal(await page.locator('.login-dialog .form-error').count(), 0);
+    await page.getByRole('link', { name: '使用钉钉登录' }).waitFor();
+    await sleep(250);
+    await page.screenshot({ path: join(ARTIFACTS, 'login-dialog.png') });
+    await Promise.all([
+      page.waitForURL((url) => url.origin === base && url.pathname === '/', { timeout: 20000 }),
+      page.getByRole('link', { name: '使用钉钉登录' }).click(),
+    ]);
+    await page.locator('.user-name', { hasText: 'E2E 测试员' }).waitFor({ timeout: 20000 });
+    const authorizeRequests = fake.requests.filter((request) => request.type === 'authorize');
+    assert.equal(authorizeRequests.length, 1, '应完成一次钉钉授权跳转');
+    const authorizeQuery = authorizeRequests[0].query;
+    assert.equal(authorizeQuery.client_id, E2E_APP_KEY);
+    assert.equal(authorizeQuery.response_type, 'code');
+    assert.equal(authorizeQuery.scope, 'openid');
+    assert.equal(authorizeQuery.prompt, 'consent');
+    assert.equal(authorizeQuery.corpId, E2E_CORP_ID);
+    assert.equal(authorizeQuery.redirect_uri, `${base}/api/auth/callback`);
+    assert.ok((authorizeQuery.state ?? '').length >= 20);
+    const tokenRequests = fake.requests.filter((request) => request.type === 'token');
+    assert.equal(tokenRequests.length, 1);
+    assert.equal(tokenRequests[0].body.clientId, E2E_APP_KEY);
+    assert.equal(tokenRequests[0].body.clientSecret, E2E_APP_SECRET);
+    assert.equal(tokenRequests[0].body.code, 'fake-code-1');
+    assert.equal(tokenRequests[0].body.grantType, 'authorization_code');
+    const userinfoRequests = fake.requests.filter((request) => request.type === 'userinfo');
+    assert.equal(userinfoRequests.length, 1);
+    assert.equal(userinfoRequests[0].token, 'fake-access-token');
+    const loggedInState = await page.evaluate(async () => (await fetch('/api/state')).json());
+    assert.equal(loggedInState.loginConfigured, true);
+    assert.equal(loggedInState.user.nick, 'E2E 测试员');
 
     step('B1 投 5 个不同图标');
     for (const [index, id] of ['01', '02', '03', '04', '05'].entries()) {
@@ -178,6 +348,9 @@ async function main() {
     assert.equal((await page.locator('[data-testid="my-votes-count"]').innerText()).trim(), '5/5');
     assert.equal((await page.locator('[data-testid="total-votes"]').innerText()).trim(), '5');
     assert.equal((await page.locator('[data-testid="voters-count"]').innerText()).trim(), '1');
+    const zeroVoteMeta = await normalizedText(page.locator('[data-icon-id="20"] .icon-meta'));
+    assert.equal(zeroVoteMeta, '0 票', '0 票卡片只显示票数，不显示排名');
+    assert.equal(await page.locator('[data-icon-id="20"] .rank-badge').count(), 0);
 
     step('B1 第 6 票被拒且数据不变');
     await clickIcon(page, '06');
@@ -208,17 +381,12 @@ async function main() {
     await page.locator('.user-name', { hasText: 'E2E 测试员' }).waitFor();
     assert.equal((await page.locator('[data-testid="my-votes-count"]').innerText()).trim(), '5/5');
     assert.equal(await page.locator('.icon-button[aria-pressed="true"]').count(), 5);
-    const stateAfterReload = await page.evaluate(async () =>
-      (await fetch('/api/state')).json(),
-    );
+    const stateAfterReload = await page.evaluate(async () => (await fetch('/api/state')).json());
     assert.equal(stateAfterReload.myVotes.length, 5);
     assert.ok(stateAfterReload.myVotes.includes('06'));
     assert.ok(!stateAfterReload.myVotes.includes('03'));
     assert.equal(stateAfterReload.user.nick, 'E2E 测试员');
-    const desktopOverflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - window.innerWidth,
-    );
-    assert.ok(desktopOverflow <= 1, `1440px 不应横向滚动（超出 ${desktopOverflow}px）`);
+    await expectNoHorizontalScroll(page, '1440px 前台');
     await page.screenshot({ path: join(ARTIFACTS, 'vote-desktop.png'), fullPage: true });
 
     step('D1 375px 移动端两列、无横向滚动');
@@ -239,26 +407,17 @@ async function main() {
       `375px 不应横向滚动（${mobileLayout.scrollWidth} > ${mobileLayout.innerWidth}）`,
     );
     assert.ok(await page.locator('[data-testid="my-votes-count"]').isVisible());
+    const mobileStatusBar = await normalizedText(page.locator('.status-bar'));
+    assert.equal(mobileStatusBar.includes('剩余'), false);
+    assert.equal(mobileStatusBar.includes('登录后投票'), false);
     await page.screenshot({ path: join(ARTIFACTS, 'vote-mobile.png'), fullPage: true });
+    await page.setViewportSize({ width: 1440, height: 900 });
 
-    step('C1/C2/C3 后台登录、总览与投票人明细');
-    const adminContext = await browser.newContext({
-      viewport: { width: 1440, height: 900 },
-      locale: 'zh-CN',
-    });
-    userContexts.push(adminContext);
-    const adminPage = await adminContext.newPage();
-    adminPage.setDefaultTimeout(15000);
-    await adminPage.goto(`${base}/admin`, { waitUntil: 'domcontentloaded' });
+    step('C2/C3 后台总览、投票人明细与钉钉配置持久化');
     await adminPage.locator('#admin-password').waitFor();
-    await adminPage.fill('#admin-password', 'wrong-password');
-    await adminPage.getByRole('button', { name: '进入后台' }).click();
-    await adminPage.locator('.form-error').waitFor();
-    assert.match(await adminPage.locator('.form-error').innerText(), /不正确/);
     await adminPage.fill('#admin-password', E2E_ADMIN_PASSWORD);
     await adminPage.getByRole('button', { name: '进入后台' }).click();
     await adminPage.getByRole('heading', { name: '投票管理' }).waitFor();
-    await adminPage.locator('[data-testid="admin-total-votes"]').waitFor();
     await expectAdminTotal(adminPage, 5);
     assert.equal(
       (await adminPage.locator('[data-testid="admin-voters-count"]').innerText()).trim(),
@@ -267,7 +426,20 @@ async function main() {
     const votersText = await adminPage.locator('.voters-table').innerText();
     assert.match(votersText, /E2E 测试员/);
     assert.equal(await adminPage.locator('.voters-table .vote-chips li').count(), 5);
+    await adminPage.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="dingtalk-status"]')?.textContent.trim() === '已配置',
+    );
+    assert.equal((await adminPage.content()).includes(E2E_APP_SECRET), false, '后台 DOM 不能包含 AppSecret');
+    await dismissToasts(adminPage);
     await adminPage.screenshot({ path: join(ARTIFACTS, 'admin-dashboard.png'), fullPage: true });
+    await adminPage.setViewportSize({ width: 375, height: 812 });
+    await adminPage.reload({ waitUntil: 'domcontentloaded' });
+    await adminPage.getByRole('heading', { name: '投票管理' }).waitFor();
+    await adminPage.locator('[data-testid="dingtalk-panel"]').waitFor();
+    await expectNoHorizontalScroll(adminPage, '管理后台 375px');
+    await adminPage.screenshot({ path: join(ARTIFACTS, 'admin-mobile.png'), fullPage: true });
+    await adminPage.setViewportSize({ width: 1440, height: 900 });
 
     step('后台管理员会话不能投票（403）');
     const adminVoteStatus = await adminPage.evaluate(async () => {
@@ -279,8 +451,11 @@ async function main() {
     step('B5 关闭投票 → 前台冻结');
     await adminPage.getByRole('button', { name: '关闭投票' }).click();
     await adminPage.getByRole('button', { name: '开启投票' }).waitFor();
+    assert.equal(
+      (await normalizedText(adminPage.locator('.control-panel .status-pill'))).includes('已关闭'),
+      true,
+    );
 
-    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
     await page.locator('.closed-banner').waitFor();
     assert.match(await page.locator('.closed-banner').innerText(), /投票已结束/);
@@ -336,7 +511,7 @@ async function main() {
     await expectAdminTotal(adminPage, 0);
     await adminPage.screenshot({ path: join(ARTIFACTS, 'admin-reset.png'), fullPage: true });
 
-    step('C6 重置后公众统计归零、用户保留');
+    step('C6 重置后公众统计归零、用户保留、0 票卡片无排名');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.locator('.icon-grid .icon-card').first().waitFor();
     await page.waitForFunction(
@@ -344,6 +519,21 @@ async function main() {
     );
     assert.equal((await page.locator('[data-testid="my-votes-count"]').innerText()).trim(), '0/5');
     await page.locator('.user-name', { hasText: 'E2E 测试员' }).waitFor();
+    const metas = await page.locator('.icon-meta').allInnerTexts();
+    assert.equal(metas.length, 20);
+    for (const meta of metas) {
+      assert.match(meta.replace(/\s+/g, ' ').trim(), /^0 票$/, '重置后 0 票卡片不应显示排名');
+    }
+    assert.equal(await page.locator('.rank-badge').count(), 0);
+    const finalStatusBar = await normalizedText(page.locator('.status-bar'));
+    assert.equal(finalStatusBar.includes('剩余'), false);
+    assert.equal(finalStatusBar.includes('登录后投票'), false);
+    await expectNoHorizontalScroll(page, '重置后 1440px 前台');
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('.icon-grid .icon-card').first().waitFor();
+    await expectNoHorizontalScroll(page, '重置后 375px 前台');
+    await page.setViewportSize({ width: 1440, height: 900 });
 
     console.log(`\n✅ E2E 全部通过（${steps.length} 个步骤）`);
     for (const name of steps) console.log(`   ✓ ${name}`);
@@ -362,6 +552,7 @@ async function main() {
     process.exitCode = 1;
   } finally {
     if (browser) await browser.close().catch(() => {});
+    await fake.close().catch(() => {});
     server.kill('SIGTERM');
     await new Promise((resolvePromise) => {
       const timer = setTimeout(() => {
@@ -374,6 +565,29 @@ async function main() {
       });
     });
     serverLog.end();
+    await sleep(100);
+
+    try {
+      const logText = readFileSync(serverLogPath, 'utf8');
+      assert.equal(logText.includes(E2E_APP_SECRET), false, '服务日志不能包含 AppSecret');
+      assert.equal(logText.includes('AUTH_MODE=mock'), false, '日志不应再出现 AUTH_MODE mock');
+      if (dingtalkSaved) {
+        const db = new DatabaseSync(join(dataDir, 'toupiao.db'), { readOnly: true });
+        try {
+          const row = db
+            .prepare("SELECT value FROM settings WHERE key = 'dingtalk.app_secret_enc'")
+            .get();
+          assert.ok(row?.value?.startsWith('v1:'), '数据库应保存 v1 密文');
+          assert.equal(row.value.includes(E2E_APP_SECRET), false, '数据库不能出现明文 AppSecret');
+        } finally {
+          db.close();
+        }
+      }
+    } catch (error) {
+      console.error('❌ E2E 安全自查失败：', error);
+      process.exitCode = 1;
+    }
+
     rmSync(dataDir, { recursive: true, force: true });
   }
 }

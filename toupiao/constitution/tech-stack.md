@@ -13,7 +13,7 @@
 | 数据库 | SQLite，Node 内置 `node:sqlite`（`DatabaseSync`），WAL 模式 |
 | 运行时 npm 依赖 | **零**（只用 Node 内置模块与全局 `fetch`） |
 | 前端 | Vue 3 + Vue Router 4 + Vite 7，原生 CSS，无 UI 组件库 |
-| 登录 | 钉钉 OAuth2 扫码登录；本地开发用 `AUTH_MODE=mock` |
+| 登录 | 钉钉 OAuth2 扫码登录；站点/AppKey/AppSecret/corpId 在管理后台配置（DB > env） |
 | 会话 | HMAC-SHA256 签名的 HttpOnly cookie（员工 / 管理员两种角色） |
 | 部署 | 单容器 Docker（多阶段构建），宿主端口 3001 |
 | 测试 | `node:test`（接口/集成）+ Playwright-core（本机 Chrome 的 E2E） |
@@ -37,18 +37,19 @@
 server/                       后端
 ├── index.js                  入口：加载配置、建库、启动 HTTP、优雅退出
 ├── app.js                    路由表与请求分发
-├── config.js                 环境变量读取与校验（失败即退出）
+├── config.js                 环境变量读取与校验（仅 ADMIN_PASSWORD / SESSION_SECRET 必填）
 ├── db.js                     SQLite 打开、迁移、查询与事务
-├── auth.js                   会话签名、钉钉 OAuth2、mock 登录、鉴权
+├── dingtalk-config.js        钉钉配置解析（DB > env）、AES-256-GCM 加解密、校验
+├── auth.js                   会话签名、钉钉 OAuth2、鉴权
 ├── icons.js                  扫描图标目录、静态图响应
 ├── http.js                   JSON/cookie/静态文件/安全响应头等工具
 ├── rate-limit.js             登录与投票的简单内存限流
 ├── state.js                  聚合前台/后台状态（票数、排名、我的投票）
 └── routes/
     ├── public.js             /api/health、/api/state
-    ├── auth.js               /api/auth/*
+    ├── auth.js               /api/auth/login|callback|logout
     ├── votes.js              /api/votes/*
-    └── admin.js              /api/admin/*
+    └── admin.js              /api/admin/*（含 /dingtalk 配置）
 
 client/                       Vue 前台与后台（同一个 SPA）
 ├── index.html
@@ -76,7 +77,9 @@ docs/                         部署与钉钉接入手册
 - 表：
   - `users(id, union_id UNIQUE, nick, avatar_url, created_at, last_login_at)`
   - `votes(id, user_id, icon_id, created_at, UNIQUE(user_id, icon_id))`
-  - `settings(key PRIMARY KEY, value)`，至少含 `voting_open`（`"1"` / `"0"`）。
+  - `settings(key PRIMARY KEY, value)`：`voting_open`（`"1"` / `"0"`）与钉钉配置键
+  `dingtalk.app_key`、`dingtalk.app_secret_enc`（AES-256-GCM 密文，`v1:` 前缀）、
+  `dingtalk.corp_id`、`dingtalk.public_base_url`。
 - 迁移通过 `PRAGMA user_version` 顺序执行；schema 变更必须写迁移函数。
 - 票数不单独存计数器，查询时 `COUNT(*)` 聚合，避免计数漂移。
 
@@ -92,10 +95,17 @@ docs/                         部署与钉钉接入手册
 
 ### 登录与安全
 
-- 钉钉流程：`/api/auth/login` 生成随机 `state` 写入 HttpOnly cookie → 跳转
-  `https://login.dingtalk.com/oauth2/auth` → 回调校验 `state` → 用 code 换 userAccessToken →
-  调 `/v1.0/contact/users/me` 取 unionId/nick/avatar → upsert 用户 → 写会话 cookie。
-- 回调地址：`PUBLIC_BASE_URL + /api/auth/callback`，必须与钉钉应用配置完全一致。
+- 钉钉流程：`/api/auth/login` 读取当前生效配置；未配置时 302 回
+  `/?auth_error=AUTH_NOT_CONFIGURED`。已配置时生成随机 `state` 写入 HttpOnly cookie →
+  跳转 `https://login.dingtalk.com/oauth2/auth` → 回调校验 `state` → 用 code 换
+  userAccessToken → 调 `/v1.0/contact/users/me` 取 unionId/nick/avatar → upsert 用户 →
+  写会话 cookie。
+- 配置解析：数据库非空值 > 环境变量 > 空；`configured = appKey && appSecret && publicBaseUrl`。
+  回调地址 = `publicBaseUrl + /api/auth/callback`；每次请求读取，保存后立即生效。
+- AppSecret：AES-256-GCM，12B IV，密钥由 `SESSION_SECRET` 经 HKDF 派生；格式
+  `v1:base64url(iv|tag|ciphertext)`。解密失败视为未配置并警告一次；接口只返回 `hasSecret`。
+- 测试专用：仅 `NODE_ENV=test` 时允许 `DINGTALK_TEST_BASE` 覆盖钉钉 endpoint，生产忽略。
+- 没有 mock 登录 / `AUTH_MODE`；旧 `.env` 中的 `AUTH_MODE` 会被忽略。
 - 会话 cookie：`HttpOnly; SameSite=Lax; Path=/; Max-Age=7d`；HTTPS 下加 `Secure`。
   值为 `base64url(payload).HMAC-SHA256(payload, SESSION_SECRET)`。
 - 所有写操作（POST/PUT/DELETE）校验 `Origin` 与站点同源（开发环境额外允许 Vite 5173）。
@@ -118,8 +128,11 @@ docs/                         部署与钉钉接入手册
 ### 前端
 
 - 单个 SPA，路由 `/` 与 `/admin`；刷新任意前端路由由后端回退到 `index.html`。
-- 未登录可以浏览图标与实时票数；点击投票时弹出登录（钉钉按钮或 mock 姓名输入）。
-- 我的票数 x/5、剩余票数、已选状态必须始终可见；达到上限时未选卡片禁用并提示先取消。
+- 未登录可以浏览图标与实时票数；点击投票时弹出只有“使用钉钉登录”的弹窗；
+  `/api/state` 的 `loginConfigured=false` 时提示“登录暂未开放”，不跳转。
+- 状态栏只保留投票状态 pill 与“已投 x/5”；hero 只展示总票数/参与人数；
+  0 票卡片只显示“0 票”，不显示排名。
+- 已选状态、满 5 票提示必须可见；达到上限时未选卡片禁用并提示先取消。
 - 每 5 秒轮询 `/api/state`（页面隐藏时暂停），投票操作后用响应立即更新，避免等待。
 - 移动端优先：375px 宽无横向滚动，卡片两列；桌面四到五列。
 - 前台不出现任何投票人姓名或头像列表。
@@ -127,6 +140,8 @@ docs/                         部署与钉钉接入手册
 ### 管理端
 
 - 独立口令会话；管理员角色不可投票（投票接口返回 403）。
+- 后台「钉钉登录」面板可配置站点地址/AppKey/AppSecret/corpId，回调地址只读可复制；
+  AppSecret 留空表示保留，保存后立即生效。
 - 重置必须请求体 `{ "confirm": "RESET" }`，只删 `votes`，保留 `users`。
 - CSV 以 UTF-8 BOM 输出，列：姓名、图标编号、图标名称、投票时间（本地时区 ISO 字符串）。
 
@@ -151,4 +166,6 @@ npm run test:e2e     # 构建并启动临时服务 + 本机 Chrome 跑端到端
 - 应用端口 3001（仅本机），对外 HTTPS 3100 由共享 Caddy 提供（见 `deploy/ports.md`）。
 - 卷：`./data:/app/data`、`./assets/icons:/app/assets/icons:ro`。
 - 健康检查：`GET /api/health`。
+- 启动只要求 `ADMIN_PASSWORD` / `SESSION_SECRET`；钉钉配置推荐在后台填写，
+  `DINGTALK_*` / `PUBLIC_BASE_URL` 只是可选引导值。
 - 真实钉钉登录依赖 HTTPS 域名；本阶段先准备 Docker 与端口，域名接线见 `docs/README.md`。

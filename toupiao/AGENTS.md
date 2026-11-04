@@ -31,7 +31,7 @@ toupiao/
 ├── Dockerfile / .dockerignore
 ├── docker-compose.yml
 ├── constitution/             ← mission / roadmap / tech-stack
-├── specs/                    ← README + _template + spec-001
+├── specs/                    ← README + _template + spec-001/spec-002
 ├── .ai/                      ← decisions / workflows / prompts / rules
 ├── docs/                     ← 部署与钉钉接入操作手册
 ├── assets/icons/             ← 20 张候选图（**不入库**，见下）
@@ -58,11 +58,16 @@ Vue 3 + Vue Router 4 + Vite 7；Node.js 24 内置 `http` + `node:sqlite`，零�
 - **图标不入库**（用户 2026-11-04 明确要求）。`assets/icons/*.png` 被项目 `.gitignore` 忽略；
   本地构建与 Docker 通过只读目录挂载提供图标。**部署到新机器前必须手工上传这 20 张图**，
   否则页面无图可投。详见 `assets/icons/README.md`。
-- **钉钉凭据只进环境变量**：`DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID` /
-  `SESSION_SECRET` / `ADMIN_PASSWORD` 一律不写进代码、不提交、不打印到日志。
-- **mock 登录只用于本地开发**。`AUTH_MODE=mock` 时服务端启动日志会明确警告；
-  上线必须使用 `AUTH_MODE=dingtalk`，并配置真实的钉钉应用与回调地址。
-- **界面只给用户看**：不展示开发模式、实现说明或类似“票数如何公开”的解释性文案；
+- **登录只有钉钉扫码 OAuth2**。没有 mock 登录、开发者模式或测试登录入口；
+  未配置钉钉时服务照常启动，员工点登录提示“登录暂未开放”。
+- **钉钉配置后台化**：站点地址、AppKey、AppSecret、corpId 存在 `settings` 表，
+  解析顺序为数据库非空值 > 环境变量；后台保存后立即生效，无需重启。
+  `DINGTALK_*` / `PUBLIC_BASE_URL` 只是可选引导值。
+- **AppSecret 加密落库**：AES-256-GCM，密钥由 `SESSION_SECRET` 经 HKDF 派生；
+  接口只返回 `hasSecret`，不得回传明文、写日志或提交。换 `SESSION_SECRET` 后需重填 AppSecret。
+- **密钥不写代码、不提交**：`SESSION_SECRET` / `ADMIN_PASSWORD` 只从环境变量读取；
+  AppSecret 只经后台或可选环境变量进入，一律不打印到日志。
+- **界面只给用户看**：不展示实现说明或类似“票数如何公开”的解释性文案；
   只保留用户需要的状态、操作与必要提示（2026-11-04 用户要求）。
 - **前台公开排名与票数**（用户 2026-11-04 决定）。前台**不得**公开投票人姓名；
   投票人明细只在管理员鉴权后可读。
@@ -75,7 +80,7 @@ Vue 3 + Vue Router 4 + Vite 7；Node.js 24 内置 `http` + `node:sqlite`，零�
 
 ```bash
 npm install                 # 安装前端构建与测试依赖（后端无运行时依赖）
-cp .env.example .env        # 填写口令与会话密钥；本地开发把 AUTH_MODE 改成 mock
+cp .env.example .env        # 至少填写 ADMIN_PASSWORD / SESSION_SECRET；钉钉配置可在后台填
 npm run dev                 # 同时起后端 3001 与 Vite 5173
 npm run build               # 构建 client/dist
 npm start                   # 生产模式启动，默认 http://localhost:3001

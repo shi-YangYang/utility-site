@@ -50,7 +50,6 @@ async function request(path, { method = 'GET', body, headers = {} } = {}) {
 
 export const api = {
   getState: () => request('/api/state'),
-  mockLogin: (name) => request('/api/auth/mock', { method: 'POST', body: { name } }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
   vote: (iconId) => request(`/api/votes/${encodeURIComponent(iconId)}`, { method: 'PUT' }),
   unvote: (iconId) => request(`/api/votes/${encodeURIComponent(iconId)}`, { method: 'DELETE' }),
@@ -60,6 +59,9 @@ export const api = {
   getVoters: () => request('/api/admin/voters'),
   setVotingOpen: (votingOpen) =>
     request('/api/admin/settings', { method: 'PUT', body: { votingOpen } }),
+  getDingTalkSettings: () => request('/api/admin/dingtalk'),
+  saveDingTalkSettings: (settings) =>
+    request('/api/admin/dingtalk', { method: 'PUT', body: settings }),
   resetVotes: (confirm) => request('/api/admin/reset', { method: 'POST', body: { confirm } }),
   exportUrl: '/api/admin/export.csv',
 };

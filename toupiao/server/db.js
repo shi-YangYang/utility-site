@@ -130,6 +130,19 @@ export class Store {
     return row ? row.value : null;
   }
 
+  setSetting(key, value) {
+    this.db
+      .prepare(
+        `INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      )
+      .run(key, String(value));
+  }
+
+  deleteSetting(key) {
+    this.db.prepare('DELETE FROM settings WHERE key = ?').run(key);
+  }
+
   isVotingOpen() {
     return this.getSetting('voting_open') === '1';
   }

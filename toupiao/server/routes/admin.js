@@ -1,5 +1,10 @@
 import { clearAdminSession, requireAdmin, setAdminSession } from '../auth.js';
 import {
+  publicDingTalkSettings,
+  resolveDingTalkSettings,
+  saveDingTalkSettings,
+} from '../dingtalk-config.js';
+import {
   HttpError,
   applySecurityHeaders,
   csvDocument,
@@ -40,7 +45,7 @@ export async function login(ctx) {
   ctx.loginLimiter.reset(key);
   setAdminSession(res, req, config);
   logger.info?.('[admin] 管理员登录成功');
-  sendJson(res, 200, { ok: true, authMode: config.authMode });
+  sendJson(res, 200, { ok: true });
 }
 
 /** POST /api/admin/logout */
@@ -60,6 +65,7 @@ export async function state(ctx) {
       store: ctx.store,
       iconStore: ctx.iconStore,
       config: ctx.config,
+      logger: ctx.logger,
     }),
   );
 }
@@ -72,6 +78,22 @@ export async function voters(ctx) {
     200,
     buildVoters({ store: ctx.store, iconStore: ctx.iconStore }),
   );
+}
+
+/** GET /api/admin/dingtalk → 当前生效的钉钉配置（绝不返回 AppSecret）。 */
+export async function getDingtalk(ctx) {
+  requireAdmin(ctx.req, ctx.config);
+  const settings = resolveDingTalkSettings(ctx.store, ctx.config, { logger: ctx.logger });
+  sendJson(ctx.res, 200, publicDingTalkSettings(settings));
+}
+
+/** PUT /api/admin/dingtalk → 保存配置，立即生效。 */
+export async function updateDingtalk(ctx) {
+  requireAdmin(ctx.req, ctx.config);
+  const { req, res, config, store, logger } = ctx;
+  const body = (await readJsonBody(req, config.bodyLimit)) ?? {};
+  const settings = saveDingTalkSettings(store, body, { config, logger });
+  sendJson(res, 200, settings);
 }
 
 /** PUT /api/admin/settings {votingOpen} */

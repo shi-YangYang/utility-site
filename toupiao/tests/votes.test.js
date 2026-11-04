@@ -6,19 +6,19 @@ test('投票权限：未登录 401、管理员会话 403、图标不存在 404',
   const server = await startServer();
   t.after(() => server.close());
 
-  const anonymous = createClient(server.base);
+  const anonymous = createClient(server.base, server);
   let response = await anonymous.put('/api/votes/01');
   assert.equal(response.status, 401);
   assert.equal(response.json.error, 'AUTH_REQUIRED');
 
-  const adminOnly = createClient(server.base);
+  const adminOnly = createClient(server.base, server);
   await adminOnly.loginAdmin();
   response = await adminOnly.put('/api/votes/01');
   assert.equal(response.status, 403);
   assert.equal(response.json.error, 'ADMIN_CANNOT_VOTE');
 
-  const bothSessions = createClient(server.base);
-  await bothSessions.login('同时登录的员工');
+  const bothSessions = createClient(server.base, server);
+  await bothSessions.loginAs('同时登录的员工');
   await bothSessions.loginAdmin();
   response = await bothSessions.put('/api/votes/01');
   assert.equal(response.status, 403, '只要存在管理员会话就不能投票');
@@ -27,8 +27,8 @@ test('投票权限：未登录 401、管理员会话 403、图标不存在 404',
   assert.equal(response.status, 403);
   assert.equal(server.store.getTotals().totalVotes, 0);
 
-  const employee = createClient(server.base);
-  await employee.login('投票员工');
+  const employee = createClient(server.base, server);
+  await employee.loginAs('投票员工');
   response = await employee.put('/api/votes/99');
   assert.equal(response.status, 404);
   assert.equal(response.json.error, 'ICON_NOT_FOUND');
@@ -39,8 +39,8 @@ test('投票权限：未登录 401、管理员会话 403、图标不存在 404',
 test('5 票上限、重复投票幂等、取消与改投', async (t) => {
   const server = await startServer();
   t.after(() => server.close());
-  const client = createClient(server.base);
-  await client.login('张三');
+  const client = createClient(server.base, server);
+  await client.loginAs('张三');
 
   for (const [index, id] of ['01', '02', '03', '04', '05'].entries()) {
     const response = await client.put(`/api/votes/${id}`);
@@ -84,8 +84,8 @@ test('5 票上限、重复投票幂等、取消与改投', async (t) => {
 test('并发 6 个投票请求：最多 5 个成功，1 个 409', async (t) => {
   const server = await startServer();
   t.after(() => server.close());
-  const client = createClient(server.base);
-  await client.login('并发用户');
+  const client = createClient(server.base, server);
+  await client.loginAs('并发用户');
 
   const ids = ['01', '02', '03', '04', '05', '06'];
   const responses = await Promise.all(ids.map((id) => client.put(`/api/votes/${id}`)));
@@ -106,10 +106,10 @@ test('并发 6 个投票请求：最多 5 个成功，1 个 409', async (t) => {
 test('不同用户投同一图标各自计票，票数与参与人数正确', async (t) => {
   const server = await startServer();
   t.after(() => server.close());
-  const first = createClient(server.base);
-  const second = createClient(server.base);
-  await first.login('用户甲');
-  await second.login('用户乙');
+  const first = createClient(server.base, server);
+  const second = createClient(server.base, server);
+  await first.loginAs('用户甲');
+  await second.loginAs('用户乙');
 
   await first.put('/api/votes/01');
   await first.put('/api/votes/02');
@@ -132,9 +132,9 @@ test('不同用户投同一图标各自计票，票数与参与人数正确', as
 test('关闭投票冻结新增与取消，重新开启后恢复', async (t) => {
   const server = await startServer();
   t.after(() => server.close());
-  const user = createClient(server.base);
-  const admin = createClient(server.base);
-  await user.login('冻结测试');
+  const user = createClient(server.base, server);
+  const admin = createClient(server.base, server);
+  await user.loginAs('冻结测试');
   await admin.loginAdmin();
   await user.put('/api/votes/01');
 
@@ -165,8 +165,8 @@ test('关闭投票冻结新增与取消，重新开启后恢复', async (t) => {
 test('会话被篡改后投票返回 401，不写入数据库', async (t) => {
   const server = await startServer();
   t.after(() => server.close());
-  const client = createClient(server.base);
-  await client.login('篡改测试');
+  const client = createClient(server.base, server);
+  await client.loginAs('篡改测试');
   const token = client.cookies.get('toupiao_session');
   client.setCookie('toupiao_session', `${token.slice(0, -1)}x`);
 
@@ -178,8 +178,8 @@ test('会话被篡改后投票返回 401，不写入数据库', async (t) => {
 test('投票响应结构：包含 myVotes/icons/totalVotes/votersCount', async (t) => {
   const server = await startServer();
   t.after(() => server.close());
-  const client = createClient(server.base);
-  await client.login('结构测试');
+  const client = createClient(server.base, server);
+  await client.loginAs('结构测试');
   const response = await client.put('/api/votes/01');
   assert.equal(response.status, 200);
   assert.deepEqual(response.json.myVotes, ['01']);

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue';
+import DingTalkSettings from './DingTalkSettings.vue';
 
 const props = defineProps({
   admin: { type: Object, required: true },
@@ -7,7 +8,7 @@ const props = defineProps({
   busy: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['refresh', 'toggle', 'logout', 'reset']);
+const emit = defineEmits(['refresh', 'toggle', 'reset']);
 
 const sortMode = ref('recent');
 const resetOpen = ref(false);
@@ -79,7 +80,6 @@ function confirmReset() {
           刷新数据
         </button>
         <a class="btn" href="/api/admin/export.csv" download>导出 CSV</a>
-        <button type="button" class="btn btn-ghost" @click="$emit('logout')">退出后台</button>
       </div>
     </section>
 
@@ -105,8 +105,11 @@ function confirmReset() {
     </section>
 
     <section class="panel control-panel">
-      <div>
+      <div class="control-copy">
         <h2>投票开关</h2>
+        <span class="status-pill" :class="{ closed: !admin.votingOpen }">
+          {{ admin.votingOpen ? '进行中' : '已关闭' }}
+        </span>
       </div>
       <button
         type="button"
@@ -118,6 +121,8 @@ function confirmReset() {
         {{ admin.votingOpen ? '关闭投票' : '开启投票' }}
       </button>
     </section>
+
+    <DingTalkSettings />
 
     <div class="admin-columns">
       <section class="panel" aria-labelledby="admin-icons-title">

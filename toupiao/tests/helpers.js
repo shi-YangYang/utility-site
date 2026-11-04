@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createApp } from '../server/app.js';
+import { createUserSessionToken } from '../server/auth.js';
 import { loadConfig } from '../server/config.js';
 import { createStore } from '../server/db.js';
 import { createIconStore, scanIcons } from '../server/icons.js';
@@ -49,10 +50,14 @@ export async function startServer(options = {}) {
   }
 
   const env = {
-    AUTH_MODE: 'mock',
+    NODE_ENV: 'test',
     ADMIN_PASSWORD: 'test-admin-123',
     SESSION_SECRET: 'test-session-secret-0123456789abcdef-xyz',
     PUBLIC_BASE_URL: '',
+    DINGTALK_APP_KEY: '',
+    DINGTALK_APP_SECRET: '',
+    DINGTALK_CORP_ID: '',
+    DINGTALK_TEST_BASE: '',
     DATA_DIR: join(dir, 'data'),
     ICONS_DIR: iconsDir,
     TRUST_PROXY: '0',
@@ -111,8 +116,11 @@ export async function startServer(options = {}) {
 
 /**
  * 带 cookie jar 的测试客户端，默认不自动跟随重定向（便于断言跳转参数）。
+ *
+ * 第二个参数传 startServer() 的返回值，loginAs 才能直接写用户与会话 cookie；
+ * 不传时只能做匿名/管理员请求。
  */
-export function createClient(base, { fetchImpl = globalThis.fetch } = {}) {
+export function createClient(base, server = null) {
   const cookies = new Map();
 
   async function request(path, options = {}) {
@@ -137,7 +145,7 @@ export function createClient(base, { fetchImpl = globalThis.fetch } = {}) {
       payload = JSON.stringify(body);
     }
 
-    const response = await fetchImpl(base + path, {
+    const response = await fetch(base + path, {
       method,
       headers: requestHeaders,
       body: payload,
@@ -184,15 +192,18 @@ export function createClient(base, { fetchImpl = globalThis.fetch } = {}) {
     setCookie(name, value) {
       cookies.set(name, value);
     },
-    async login(name = '测试员工') {
-      const response = await request('/api/auth/mock', {
-        method: 'POST',
-        body: { name },
-      });
-      if (response.status !== 200) {
-        throw new Error(`mock 登录失败：${response.status} ${response.text}`);
+    /**
+     * 直接注入员工会话，绕过已删除的 HTTP mock 登录。
+     * 同名用户复用同一个测试 unionId，行为与“同一钉钉用户重新登录”一致。
+     */
+    async loginAs(name = '测试员工') {
+      if (!server?.store || !server?.config) {
+        throw new Error('loginAs 需要传入 createClient(base, startServer()) 的返回值');
       }
-      return response;
+      const unionId = `test:${name}`;
+      const user = server.store.upsertUser({ unionId, nick: name, avatarUrl: '' });
+      cookies.set('toupiao_session', createUserSessionToken(user.id, server.config));
+      return user;
     },
     async loginAdmin(password = 'test-admin-123') {
       const response = await request('/api/admin/login', {

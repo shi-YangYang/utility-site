@@ -141,20 +141,6 @@ img {
   color: var(--muted);
 }
 
-.dev-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--warning-soft);
-  border: 1px solid #f0c477;
-  color: #7a4300;
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
 .header-actions {
   display: flex;
   align-items: center;
@@ -312,7 +298,7 @@ input:focus-visible {
   text-decoration: underline;
 }
 
-/* ---------- 页面与开发模式横幅 ---------- */
+/* ---------- 页面 ---------- */
 
 .page {
   min-height: 100vh;
@@ -322,33 +308,6 @@ input:focus-visible {
   max-width: 1280px;
   margin: 0 auto;
   padding: 24px 24px 64px;
-}
-
-.dev-banner {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  align-items: center;
-  max-width: 1280px;
-  margin: 14px auto 0;
-  padding: 10px 16px;
-  border: 1px dashed #e0a84a;
-  border-radius: 12px;
-  background: linear-gradient(90deg, #fff8ea, #fff3d8);
-  color: #6b3d00;
-  font-size: 0.86rem;
-  width: calc(100% - 48px);
-}
-
-.dev-banner strong {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #b25e00;
-  color: #fff;
-  font-size: 0.74rem;
-  letter-spacing: 0.04em;
 }
 
 .muted {
@@ -517,6 +476,11 @@ input:focus-visible {
 .status-pill.closed {
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+.status-pill.warn {
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 .status-updated {
@@ -848,17 +812,6 @@ input:focus-visible {
   font-weight: 800;
 }
 
-.remaining {
-  margin: 0 0 12px;
-  color: var(--ink-2);
-  font-size: 0.88rem;
-}
-
-.remaining strong {
-  color: var(--primary);
-  font-size: 1.05rem;
-}
-
 .selected-list {
   display: flex;
   flex-direction: column;
@@ -1073,16 +1026,6 @@ input:focus-visible {
   margin: 4px 0 0;
   color: var(--muted);
   font-size: 0.9rem;
-}
-
-.dev-notice {
-  margin: 0 0 14px;
-  padding: 9px 12px;
-  border: 1px dashed #e0a84a;
-  border-radius: 10px;
-  background: #fff8ea;
-  color: #6b3d00;
-  font-size: 0.82rem;
 }
 
 .login-form {
@@ -1559,6 +1502,98 @@ input::placeholder {
   font-size: 0.76rem;
 }
 
+/* ---------- 钉钉登录配置 ---------- */
+
+.panel-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dingtalk-panel {
+  margin-bottom: 22px;
+  border-left: 4px solid #4b86ff;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.field input {
+  font-weight: 400;
+}
+
+.callback-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.callback-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.callback-row input {
+  flex: 1;
+  min-width: 0;
+  background: #f8faff;
+  color: var(--ink-2);
+}
+
+.callback-row .btn {
+  flex: none;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.settings-result {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.settings-result.success {
+  color: var(--success);
+}
+
+.settings-result.error {
+  color: var(--danger);
+}
+
+.control-copy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 /* ---------- 响应式 ---------- */
 
 @media (max-width: 1180px) {
@@ -1640,12 +1675,6 @@ input::placeholder {
 
   .page-main {
     padding: 16px 14px 52px;
-  }
-
-  .dev-banner {
-    width: calc(100% - 28px);
-    margin-top: 10px;
-    padding: 9px 12px;
   }
 
   .hero {
@@ -1798,6 +1827,19 @@ input::placeholder {
   .admin-footer {
     flex-direction: column;
     gap: 2px;
+  }
+
+  .settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .callback-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .callback-row .btn {
+    width: 100%;
   }
 }
 

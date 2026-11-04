@@ -31,7 +31,10 @@ const barWidth = computed(() => {
 });
 
 const ariaLabel = computed(() => {
-  const base = `${props.icon.name}，${props.icon.count} 票，第 ${props.icon.rank} 名`;
+  const base =
+    props.icon.count > 0
+      ? `${props.icon.name}，${props.icon.count} 票，第 ${props.icon.rank} 名`
+      : `${props.icon.name}，0 票`;
   if (props.selected) {
     return props.votingOpen
       ? `${base}，已选中，点击取消投票`
@@ -74,8 +77,10 @@ const ariaLabel = computed(() => {
       <span class="icon-name">{{ icon.name }}</span>
       <span class="icon-meta">
         <strong>{{ icon.count }}</strong> 票
-        <span class="dot" aria-hidden="true">·</span>
-        <span>第 {{ icon.rank }} 名</span>
+        <template v-if="icon.count > 0">
+          <span class="dot" aria-hidden="true">·</span>
+          <span>第 {{ icon.rank }} 名</span>
+        </template>
       </span>
       <span class="vote-meter" aria-hidden="true">
         <span class="vote-meter-fill" :style="{ width: barWidth }"></span>

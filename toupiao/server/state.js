@@ -3,6 +3,8 @@
  * 前台状态绝不包含投票人列表、unionId 或任何会话信息。
  */
 
+import { resolveDingTalkSettings } from './dingtalk-config.js';
+
 export function rankIcons(icons, countMap) {
   const counts = icons.map((icon) => countMap.get(icon.id) ?? 0);
   return icons.map((icon, index) => {
@@ -16,8 +18,9 @@ export function iconNameFor(iconStore, iconId) {
   return iconStore.getById(iconId)?.name ?? iconId;
 }
 
-export function buildPublicState({ store, iconStore, config, session = null }) {
+export function buildPublicState({ store, iconStore, config, session = null, logger = console }) {
   const totals = store.getTotals();
+  const dingtalk = resolveDingTalkSettings(store, config, { logger });
   const icons = rankIcons(iconStore.icons, store.getIconCounts());
 
   let user = null;
@@ -34,7 +37,7 @@ export function buildPublicState({ store, iconStore, config, session = null }) {
   }
 
   return {
-    authMode: config.authMode,
+    loginConfigured: dingtalk.configured,
     votingOpen: store.isVotingOpen(),
     maxVotes: config.maxVotes,
     totalVotes: totals.totalVotes,
@@ -63,8 +66,9 @@ export function buildVoteSnapshot({ store, iconStore, config, userId }) {
   };
 }
 
-export function buildAdminState({ store, iconStore, config }) {
+export function buildAdminState({ store, iconStore, config, logger = console }) {
   const totals = store.getTotals();
+  const dingtalk = resolveDingTalkSettings(store, config, { logger });
   const icons = rankIcons(iconStore.icons, store.getIconCounts()).map((icon) => ({
     ...icon,
     share: totals.totalVotes > 0 ? Math.round((icon.count / totals.totalVotes) * 1000) / 10 : 0,
@@ -86,8 +90,8 @@ export function buildAdminState({ store, iconStore, config }) {
     icons,
     recentVotes,
     iconsAvailable: iconStore.available,
-    authMode: config.authMode,
-    publicBaseUrl: config.publicBaseUrl,
+    dingtalkConfigured: dingtalk.configured,
+    publicBaseUrl: dingtalk.publicBaseUrl,
   };
 }
 

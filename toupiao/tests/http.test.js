@@ -8,25 +8,25 @@ import { createClient, startServer } from './helpers.js';
 test('畸形 JSON 与超过 64KB 的请求体：400/413，服务不崩溃', async (t) => {
   const server = await startServer();
   t.after(() => server.close());
-  const client = createClient(server.base);
+  const client = createClient(server.base, server);
 
-  let response = await client.request('/api/auth/mock', {
+  let response = await client.request('/api/admin/login', {
     method: 'POST',
-    rawBody: '{"name":',
+    rawBody: '{"password":',
     headers: { 'content-type': 'application/json' },
   });
   assert.equal(response.status, 400);
   assert.equal(response.json.error, 'BAD_JSON');
 
-  response = await client.request('/api/auth/mock', {
+  response = await client.request('/api/admin/login', {
     method: 'POST',
-    rawBody: JSON.stringify({ name: 'x'.repeat(70 * 1024) }),
+    rawBody: JSON.stringify({ password: 'x'.repeat(70 * 1024) }),
     headers: { 'content-type': 'application/json' },
   });
   assert.equal(response.status, 413);
   assert.equal(response.json.error, 'PAYLOAD_TOO_LARGE');
 
-  response = await client.post('/api/auth/mock', [1, 2, 3]);
+  response = await client.post('/api/admin/login', [1, 2, 3]);
   assert.equal(response.status, 400);
   assert.equal(response.json.error, 'BAD_JSON');
 
@@ -40,55 +40,47 @@ test('Origin 校验：跨站写请求 403，同源/无 Origin/开发地址放行
   const server = await startServer();
   t.after(() => server.close());
 
-  const evil = createClient(server.base);
-  let response = await evil.post(
-    '/api/auth/mock',
-    { name: '跨站用户' },
-    { headers: { origin: 'https://evil.example' } },
-  );
+  const evil = createClient(server.base, server);
+  let response = await evil.post('/api/auth/logout', undefined, {
+    headers: { origin: 'https://evil.example' },
+  });
   assert.equal(response.status, 403);
   assert.equal(response.json.error, 'ORIGIN_FORBIDDEN');
 
-  response = await createClient(server.base).post(
-    '/api/auth/mock',
-    { name: 'null 用户' },
-    { headers: { origin: 'null' } },
-  );
+  response = await createClient(server.base, server).post('/api/auth/logout', undefined, {
+    headers: { origin: 'null' },
+  });
   assert.equal(response.status, 403);
 
-  response = await createClient(server.base).post(
-    '/api/auth/mock',
-    { name: '同源用户' },
-    { headers: { origin: server.base } },
-  );
+  response = await createClient(server.base, server).post('/api/auth/logout', undefined, {
+    headers: { origin: server.base },
+  });
   assert.equal(response.status, 200);
 
-  response = await createClient(server.base).post(
-    '/api/auth/mock',
-    { name: 'Vite 用户' },
-    { headers: { origin: 'http://localhost:5173' } },
-  );
+  response = await createClient(server.base, server).post('/api/auth/logout', undefined, {
+    headers: { origin: 'http://localhost:5173' },
+  });
   assert.equal(response.status, 200);
 
-  response = await createClient(server.base).post('/api/auth/mock', { name: '无 Origin 用户' });
+  response = await createClient(server.base, server).post('/api/auth/logout');
   assert.equal(response.status, 200);
 
   const production = await startServer({ env: { NODE_ENV: 'production' } });
   t.after(() => production.close());
-  response = await createClient(production.base).post(
-    '/api/auth/mock',
-    { name: '生产环境 Vite 用户' },
+  response = await createClient(production.base, production).post(
+    '/api/auth/logout',
+    undefined,
     { headers: { origin: 'http://localhost:5173' } },
   );
   assert.equal(response.status, 403, 'production 不再放行 Vite 开发地址');
-  response = await createClient(production.base).post(
-    '/api/auth/mock',
-    { name: '生产环境同源用户' },
+  response = await createClient(production.base, production).post(
+    '/api/auth/logout',
+    undefined,
     { headers: { origin: production.base } },
   );
   assert.equal(response.status, 200);
 
-  response = await createClient(server.base).get('/api/state', {
+  response = await createClient(server.base, server).get('/api/state', {
     headers: { origin: 'https://evil.example' },
   });
   assert.equal(response.status, 200, 'GET 不是写操作，不拦跨站 Origin');
@@ -97,7 +89,7 @@ test('Origin 校验：跨站写请求 403，同源/无 Origin/开发地址放行
 test('安全响应头：CSP 允许 https 头像、禁止内联脚本、nosniff/DENY 等', async (t) => {
   const server = await startServer();
   t.after(() => server.close());
-  const response = await createClient(server.base).get('/api/state');
+  const response = await createClient(server.base, server).get('/api/state');
 
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(response.headers.get('referrer-policy'), 'same-origin');
@@ -116,7 +108,7 @@ test('安全响应头：CSP 允许 https 头像、禁止内联脚本、nosniff/D
 test('API 404、405 与 OPTIONS 预检', async (t) => {
   const server = await startServer();
   t.after(() => server.close());
-  const client = createClient(server.base);
+  const client = createClient(server.base, server);
 
   let response = await client.get('/api/not-exists');
   assert.equal(response.status, 404);
@@ -142,7 +134,7 @@ test('SPA 静态托管与回退：/、/admin、带 hash 的资源、404、路径
     await server.close();
     rmSync(dist, { recursive: true, force: true });
   });
-  const client = createClient(server.base);
+  const client = createClient(server.base, server);
 
   let response = await client.get('/');
   assert.equal(response.status, 200);
@@ -169,7 +161,7 @@ test('SPA 静态托管与回退：/、/admin、带 hash 的资源、404、路径
 
   const noDist = await startServer();
   t.after(() => noDist.close());
-  response = await createClient(noDist.base).get('/');
+  response = await createClient(noDist.base, noDist).get('/');
   assert.equal(response.status, 503);
   assert.match(response.text, /前端尚未构建/);
 });

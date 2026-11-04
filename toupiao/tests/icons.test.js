@@ -62,7 +62,7 @@ test('图标扫描：编号重复保留第一个并告警，不匹配文件被�
 test('图标服务：只服务白名单、正确 Content-Type 与长缓存、路径穿越 404', async (t) => {
   const server = await startServer({ iconFiles: ['01_无限 连接.png'] });
   t.after(() => server.close());
-  const client = createClient(server.base);
+  const client = createClient(server.base, server);
 
   const state = await client.get('/api/state');
   assert.equal(state.json.iconsAvailable, true);
@@ -94,11 +94,11 @@ test('图标服务：只服务白名单、正确 Content-Type 与长缓存、路
 test('图标目录缺失或为空：服务正常启动、状态标记与空列表、图片 404', async (t) => {
   const missing = await startServer({ skipIcons: true });
   t.after(() => missing.close());
-  let state = await createClient(missing.base).get('/api/state');
+  let state = await createClient(missing.base, missing).get('/api/state');
   assert.equal(state.status, 200);
   assert.equal(state.json.iconsAvailable, false);
   assert.deepEqual(state.json.icons, []);
-  let health = await createClient(missing.base).get('/api/health');
+  let health = await createClient(missing.base, missing).get('/api/health');
   assert.equal(health.status, 200);
   assert.equal(health.json.ok, true);
   let icon = await fetch(`${missing.base}/icons/01_不存在.png`);
@@ -106,9 +106,9 @@ test('图标目录缺失或为空：服务正常启动、状态标记与空列�
 
   const empty = await startServer({ iconFiles: [] });
   t.after(() => empty.close());
-  state = await createClient(empty.base).get('/api/state');
+  state = await createClient(empty.base, empty).get('/api/state');
   assert.equal(state.json.iconsAvailable, false);
   assert.deepEqual(state.json.icons, []);
-  health = await createClient(empty.base).get('/api/health');
+  health = await createClient(empty.base, empty).get('/api/health');
   assert.equal(health.status, 200);
 });

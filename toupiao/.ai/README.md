@@ -15,4 +15,5 @@
 | 编号 | 主题 |
 |---|---|
 | [001](./decisions/001-icons-not-in-git.md) | 图标不入库：只读目录挂载 + 手工上传 |
-| [002](./decisions/002-dingtalk-oauth2-and-mock.md) | 钉钉扫码 OAuth2 + 本地 mock 双模式 |
+| [002](./decisions/002-dingtalk-oauth2-and-mock.md) | 钉钉扫码 OAuth2 + 本地 mock 双模式（历史；mock 已由 003 删除） |
+| [003](./decisions/003-dingtalk-admin-config-and-encryption.md) | 钉钉配置后台化 + AppSecret 加密，删除 mock 登录 |

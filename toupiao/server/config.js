@@ -1,7 +1,10 @@
 import { resolve } from 'node:path';
 
 /**
- * 配置读取与校验。所有密钥只从环境变量（或 .env 文件）来，不落代码、不落日志。
+ * 配置读取与校验。
+ *
+ * 启动只需要 ADMIN_PASSWORD 与 SESSION_SECRET；钉钉凭据与站点地址都是可选的引导值，
+ * 实际生效值由 server/dingtalk-config.js 按「数据库 > 环境变量」解析。
  * 校验失败会抛出 ConfigError，由 index.js 打印可读错误并退出。
  */
 
@@ -11,8 +14,8 @@ const PLACEHOLDER_SESSION_SECRETS = new Set([
   'replace-me',
   'change-me',
 ]);
-const AUTH_MODES = new Set(['dingtalk', 'mock']);
 const COOKIE_SECURE_MODES = new Set(['auto', 'true', 'false']);
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
 export class ConfigError extends Error {
   constructor(message) {
@@ -49,18 +52,28 @@ function parseBooleanMode(value, name) {
   return normalized;
 }
 
-function parseBaseUrl(raw) {
+function isLocalHostname(hostname) {
+  return LOCAL_HOSTNAMES.has(String(hostname ?? '').toLowerCase());
+}
+
+function parseBaseUrl(raw, { name = 'PUBLIC_BASE_URL', isProduction = false } = {}) {
   let url;
   try {
     url = new URL(raw);
   } catch {
-    throw new ConfigError(`PUBLIC_BASE_URL 不是合法 URL：${raw}`);
+    throw new ConfigError(`${name} 不是合法 URL：${raw}`);
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new ConfigError('PUBLIC_BASE_URL 必须以 http:// 或 https:// 开头');
+    throw new ConfigError(`${name} 必须以 http:// 或 https:// 开头`);
+  }
+  if (url.username || url.password) {
+    throw new ConfigError(`${name} 不能包含用户名或密码`);
   }
   if (url.pathname !== '/' || url.search || url.hash) {
-    throw new ConfigError('PUBLIC_BASE_URL 只能是站点根地址，不能带路径、查询串或锚点');
+    throw new ConfigError(`${name} 只能是站点根地址，不能带路径、查询串或锚点`);
+  }
+  if (isProduction && url.protocol === 'http:' && !isLocalHostname(url.hostname)) {
+    throw new ConfigError(`${name} 在生产环境必须使用 https://（localhost / 127.0.0.1 除外）`);
   }
   return url.origin;
 }
@@ -70,15 +83,9 @@ function parseBaseUrl(raw) {
  * @param {{ rootDir?: string }} [options]
  */
 export function loadConfig(env = process.env, { rootDir = process.cwd() } = {}) {
-  const authMode = optional(env, 'AUTH_MODE', '').toLowerCase();
-  if (!AUTH_MODES.has(authMode)) {
-    throw new ConfigError(
-      `AUTH_MODE 必须显式设置为 dingtalk 或 mock（当前为 ${JSON.stringify(env.AUTH_MODE ?? '')}）`,
-    );
-  }
-
   const port = parsePort(optional(env, 'PORT', '3001'));
   const nodeEnv = optional(env, 'NODE_ENV', 'development');
+  const isProduction = nodeEnv === 'production';
 
   const adminPassword = required(env, 'ADMIN_PASSWORD');
   if (adminPassword.length < 8) {
@@ -96,40 +103,39 @@ export function loadConfig(env = process.env, { rootDir = process.cwd() } = {}) 
     throw new ConfigError('SESSION_SECRET 仍是示例值，请换成随机串');
   }
 
+  // 环境变量里的站点地址只是首次部署的引导值；未设置时用本机地址兜底，
+  // 但钉钉配置解析不会把这个兜底值当作“已配置”。
   const publicBaseUrlRaw = optional(env, 'PUBLIC_BASE_URL', '');
-  let publicBaseUrl;
-  if (authMode === 'dingtalk') {
-    if (!publicBaseUrlRaw) {
-      throw new ConfigError('AUTH_MODE=dingtalk 时必须设置 PUBLIC_BASE_URL（如 https://vote.example.com）');
-    }
-    publicBaseUrl = parseBaseUrl(publicBaseUrlRaw);
-  } else {
-    publicBaseUrl = publicBaseUrlRaw ? parseBaseUrl(publicBaseUrlRaw) : `http://localhost:${port}`;
-  }
+  const envPublicBaseUrl = publicBaseUrlRaw
+    ? parseBaseUrl(publicBaseUrlRaw, { name: 'PUBLIC_BASE_URL', isProduction })
+    : '';
+  const publicBaseUrl = envPublicBaseUrl || `http://localhost:${port}`;
+
+  // 测试专用：仅在 NODE_ENV=test 时允许覆盖钉钉 endpoint；生产环境完全忽略。
+  const testBaseRaw = nodeEnv === 'test' ? optional(env, 'DINGTALK_TEST_BASE', '') : '';
+  const dingtalkTestBase = testBaseRaw
+    ? parseBaseUrl(testBaseRaw, { name: 'DINGTALK_TEST_BASE' })
+    : '';
 
   const dingtalk = {
     appKey: optional(env, 'DINGTALK_APP_KEY', ''),
     appSecret: optional(env, 'DINGTALK_APP_SECRET', ''),
     corpId: optional(env, 'DINGTALK_CORP_ID', ''),
   };
-  if (authMode === 'dingtalk') {
-    if (!dingtalk.appKey) throw new ConfigError('AUTH_MODE=dingtalk 时必须设置 DINGTALK_APP_KEY');
-    if (!dingtalk.appSecret) throw new ConfigError('AUTH_MODE=dingtalk 时必须设置 DINGTALK_APP_SECRET');
-  }
 
   const cookieSecure = parseBooleanMode(optional(env, 'COOKIE_SECURE', 'auto'), 'COOKIE_SECURE');
   const trustProxy = optional(env, 'TRUST_PROXY', '1') !== '0';
 
   return {
-    authMode,
-    isMock: authMode === 'mock',
     nodeEnv,
-    isProduction: nodeEnv === 'production',
+    isProduction,
     port,
     adminPassword,
     sessionSecret,
     publicBaseUrl,
+    envPublicBaseUrl,
     dingtalk,
+    dingtalkTestBase,
     dataDir: resolve(rootDir, optional(env, 'DATA_DIR', './data')),
     iconsDir: resolve(rootDir, optional(env, 'ICONS_DIR', './assets/icons')),
     clientDir: resolve(rootDir, 'client/dist'),

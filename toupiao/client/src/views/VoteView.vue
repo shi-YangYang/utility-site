@@ -14,14 +14,13 @@ const AUTH_ERROR_MESSAGES = {
   CODE_MISSING: '登录回调缺少授权码，请重新登录',
   DENIED: '你取消了钉钉授权，未登录',
   LOGIN_FAILED: '钉钉登录失败，请稍后重试',
+  AUTH_NOT_CONFIGURED: '登录暂未开放',
 };
 
 const state = ref(null);
 const initialLoading = ref(true);
 const loadError = ref('');
 const loginOpen = ref(false);
-const loginBusy = ref(false);
-const loginError = ref('');
 const pendingIds = ref(new Set());
 
 const limitReached = computed(
@@ -58,7 +57,10 @@ onMounted(() => {
 });
 
 function openLogin() {
-  loginError.value = '';
+  if (!state.value?.loginConfigured) {
+    toast.info('登录暂未开放');
+    return;
+  }
   loginOpen.value = true;
 }
 
@@ -120,21 +122,6 @@ async function toggleIcon(icon) {
   }
 }
 
-async function handleLogin(name) {
-  loginBusy.value = true;
-  loginError.value = '';
-  try {
-    await api.mockLogin(name);
-    await fetchState({ silent: true });
-    loginOpen.value = false;
-    toast.success('登录成功，开始投票吧');
-  } catch (error) {
-    loginError.value = error.message;
-  } finally {
-    loginBusy.value = false;
-  }
-}
-
 async function handleLogout() {
   try {
     await api.logout();
@@ -183,10 +170,6 @@ async function handleLogout() {
               <span class="stat-value" data-testid="voters-count">{{ state.votersCount }}</span>
               <span class="stat-label">已参与人数</span>
             </div>
-            <div class="hero-stat">
-              <span class="stat-value" data-testid="my-votes-hero">{{ state.myVotes.length }}/{{ state.maxVotes }}</span>
-              <span class="stat-label">我的票数</span>
-            </div>
           </div>
         </section>
 
@@ -201,10 +184,6 @@ async function handleLogout() {
           <span class="status-item">
             已投 <strong>{{ state.myVotes.length }}</strong>/{{ state.maxVotes }}
           </span>
-          <span class="status-item">
-            剩余 <strong>{{ Math.max(0, state.maxVotes - state.myVotes.length) }}</strong> 票
-          </span>
-          <button v-if="!state.user" type="button" class="link-btn" @click="openLogin">登录后投票</button>
         </section>
 
         <div class="layout">
@@ -251,13 +230,6 @@ async function handleLogout() {
       </template>
     </main>
 
-    <LoginDialog
-      :open="loginOpen"
-      :auth-mode="state?.authMode ?? 'dingtalk'"
-      :busy="loginBusy"
-      :error="loginError"
-      @close="loginOpen = false"
-      @login="handleLogin"
-    />
+    <LoginDialog :open="loginOpen" @close="loginOpen = false" />
   </div>
 </template>

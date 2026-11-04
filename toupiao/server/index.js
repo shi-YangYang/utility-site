@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { createApp } from './app.js';
 import { ConfigError, loadConfig } from './config.js';
 import { createStore, DatabaseError } from './db.js';
+import { resolveDingTalkSettings } from './dingtalk-config.js';
 import { createIconStore, scanIcons } from './icons.js';
 
 function loadEnvFile() {
@@ -89,12 +90,14 @@ function main() {
     if (!iconStore.available) {
       console.warn('[toupiao] 警告：图标目录缺失或没有 NN_名称.png，前台将显示空状态');
     }
-    if (config.isMock) {
+    const dingtalk = resolveDingTalkSettings(store, config, { logger: console });
+    if (!dingtalk.configured) {
       console.warn(
-        '[toupiao] 注意：AUTH_MODE=mock（开发模式），任何能访问站点的人都能用任意姓名登录，禁止用于公网。',
+        '[toupiao] 钉钉登录尚未配置：请用管理员登录 /admin，在「钉钉登录」面板填写站点地址、AppKey 与 AppSecret。',
       );
     }
-    console.log(`[toupiao] 监听 http://localhost:${config.port}（对外地址 ${config.publicBaseUrl}）`);
+    const publicBaseUrl = dingtalk.publicBaseUrl || config.publicBaseUrl;
+    console.log(`[toupiao] 监听 http://localhost:${config.port}（对外地址 ${publicBaseUrl}）`);
   });
 
   let shuttingDown = false;

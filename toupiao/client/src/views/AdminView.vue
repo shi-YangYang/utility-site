@@ -121,7 +121,6 @@ async function handleLogout() {
         :busy="actionBusy"
         @refresh="load({ silent: true })"
         @toggle="handleToggleVoting"
-        @logout="handleLogout"
         @reset="handleReset"
       />
     </main>
