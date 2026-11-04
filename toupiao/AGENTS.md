@@ -77,8 +77,8 @@ Vue 3 + Vue Router 4 + Vite 7；Node.js 24 内置 `http` + `node:sqlite`，零�
   投票人明细只在管理员鉴权后可读。
 - **关闭投票即冻结**：关闭后新增与取消投票都返回明确错误，已投数据不变。
 - 管理端是独立口令（`ADMIN_PASSWORD`）+ 签名会话，不复用钉钉身份；管理员会话不能投票。
-- 真实钉钉扫码登录要求回调地址是**已备案到钉钉应用的 HTTPS 地址**，通常需要域名。
-  本阶段只准备 Docker 与端口，域名/服务器接线见 `docs/README.md`。
+- 钉钉登录回调需要 HTTPS。当前生产已用 **Let's Encrypt IP 证书**（`https://106.54.224.173`，
+  6 天短周期，systemd timer 自动续期）；有域名时也可用域名证书。详见 `docs/README.md`。
 
 ## 常用命令
 

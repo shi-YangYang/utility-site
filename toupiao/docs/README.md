@@ -7,7 +7,7 @@
 
 - 一台已装 Docker + compose 插件的服务器（与 recording 共用同一台即可）。
 - 仅本机直接运行（`npm start` / `npm run dev`）需要 **Node.js 24+**；Docker 镜像已内置。
-- 一个可访问的 **HTTPS 域名**（真实钉钉登录必需；钉钉要求回调地址与备案域名匹配）。
+- 一个可公网访问的 **HTTPS 地址**（域名或纯 IP；2026 起 Let's Encrypt 支持 IP 证书）。
 - 钉钉企业内部应用的 AppKey / AppSecret（可选 corpId）。
 - 31 张候选图（不在 git 里，需单独上传；也可启动后由管理员在后台逐张上传）。
 

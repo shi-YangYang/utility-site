@@ -158,7 +158,7 @@ docker compose logs -f
 ## 部署与端口
 
 - 应用端口：`3001`（仅本机）；对外 HTTPS 走共享 Caddy 的 `443`（不再占用 3100）。
-- 需要域名的真实钉钉登录见 `docs/README.md`；Caddy 路由示例：
+- 需要 HTTPS 的真实钉钉登录见 `docs/README.md`；Caddy 路由示例：
 
   ```caddy
   https://vote.example.com {
@@ -167,7 +167,8 @@ docker compose logs -f
   ```
 
 - 后台保存的站点地址必须是对外 HTTPS 地址（本地 `localhost` / `127.0.0.1` 允许 http 调试）。
-- 本阶段只准备可部署单元与端口登记，服务器/域名接线稍后进行。
+- 当前生产：`https://106.54.224.173/`，共享 Caddy `443` + Let's Encrypt IP 证书
+  （6 天短周期，服务器 systemd timer 自动续期）；详见 `docs/README.md`。
 
 ## 开发与测试
 
@@ -195,5 +196,5 @@ AppKey/AppSecret 或域名；该服务只在 `NODE_ENV=test` + `DINGTALK_TEST_BA
 | `npm run test:e2e` | 通过（23 个步骤）：临时复制 31 张图标 → 后台上传 1 张 → 图标数 31→32、前台免重启出现且 0 票 → 非 PNG 错误提示 → 钉钉授权/登录 → 投 5 → 第 6 被拒 → 取消改投 → 刷新保持 → 375px → 后台明细 → 关闭冻结 → 重开 → CSV → 重置；含 secret 不落 DOM/日志/明文数据库的检查 |
 | Docker | 临时 compose 实测：`/app/assets/icons` 以 `rw=true` 绑定挂载，容器内 uid 1000 非 root；匿名上传 401，管理员上传 200，宿主目录出现 `32_后台上传.png`，`/api/state` 立即返回 32 个图标且新图 0 票；镜像内仍无图标、无 `.env`、无 `node_modules` |
 
-已知边界：真实钉钉扫码登录需要 HTTPS 域名与钉钉应用回调配置；图标仍不入库，新机器可先手工
+已知边界：真实钉钉扫码登录已完成跳转验证，仍需管理员实际扫码确认；图标仍不入库，新机器可先手工
 上传 31 张，或启动后由管理员在后台逐张上传。验收记录见 [`specs/`](./specs/)。
