@@ -12,7 +12,8 @@ services:
       DATA_DIR: /app/data
       ICONS_DIR: /app/assets/icons
     ports:
-      - "${HOST_PORT:-3001}:3001"
+      # 默认对宿主所有网卡开放；生产建议 BIND_HOST=172.17.0.1，只让 Caddy 访问
+      - "${BIND_HOST:-0.0.0.0}:${HOST_PORT:-3001}:3001"
     volumes:
       # SQLite 数据（可写；宿主目录属主建议 1000，见 docs/README.md）
       - ./data:/app/data

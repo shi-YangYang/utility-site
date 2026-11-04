@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # ---- 构建阶段：只负责生成 client/dist ----
 FROM node:24-alpine AS builder
 

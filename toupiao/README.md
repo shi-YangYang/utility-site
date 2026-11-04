@@ -141,7 +141,8 @@ docker compose logs -f
 ```
 
 - 容器内监听 `3001`，宿主端口由 `HOST_PORT` 控制（默认 `3001`，已登记在
-  [`../deploy/ports.md`](../deploy/ports.md)）。
+  [`../deploy/ports.md`](../deploy/ports.md)）。生产环境建议设
+  `BIND_HOST=172.17.0.1`，让 `3001` 只被 Docker 网关/Caddy 访问，不对公网暴露。
 - 数据卷：`./data:/app/data`；图标卷：`./assets/icons:/app/assets/icons`（**可写**，供后台上传）。
 - 以非 root 的 `node` 用户运行（uid 1000）；宿主 `./data` 与 `./assets/icons` 都需可写：
 
