@@ -295,6 +295,45 @@ export async function readJsonBody(req, limit = 64 * 1024) {
   return parsed;
 }
 
+/**
+ * 读取原始二进制 body（如图标上传），超过 limit 返回 413，中断返回 400。
+ * 空 body 返回空 Buffer，由调用方判断是否合法。
+ */
+export async function readBodyBuffer(req, limit = 5 * 1024 * 1024) {
+  const declared = Number(req.headers['content-length']);
+  if (Number.isFinite(declared) && declared > limit) {
+    req.resume();
+    throw new HttpError(413, 'PAYLOAD_TOO_LARGE', `请求体不能超过 ${limit} 字节`);
+  }
+
+  const chunks = [];
+  let size = 0;
+  await new Promise((resolvePromise, rejectPromise) => {
+    let done = false;
+    const finish = (error) => {
+      if (done) return;
+      done = true;
+      if (error) rejectPromise(error);
+      else resolvePromise();
+    };
+    req.on('data', (chunk) => {
+      if (done) return;
+      size += chunk.length;
+      if (size > limit) {
+        req.resume();
+        finish(new HttpError(413, 'PAYLOAD_TOO_LARGE', `请求体不能超过 ${limit} 字节`));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => finish());
+    req.on('error', () => finish(new HttpError(400, 'REQUEST_ABORTED', '请求被中断')));
+    req.on('aborted', () => finish(new HttpError(400, 'REQUEST_ABORTED', '请求被中断')));
+  });
+
+  return Buffer.concat(chunks, size);
+}
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',

@@ -16,8 +16,9 @@ services:
     volumes:
       # SQLite 数据（可写；宿主目录属主建议 1000，见 docs/README.md）
       - ./data:/app/data
-      # 20 张候选图不在镜像里，只读挂载
-      - ./assets/icons:/app/assets/icons:ro
+      # 候选图不在镜像里；可写挂载，后台上传直接写入宿主目录
+      # （宿主 assets/icons 需对容器内 uid 1000 可写，见 docs/README.md）
+      - ./assets/icons:/app/assets/icons
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3001/api/health"]
       interval: 30s

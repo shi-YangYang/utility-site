@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-# 前端源码（图标不 COPY 进镜像，运行时只读挂载）
+# 前端源码（图标不 COPY 进镜像，运行时挂载宿主目录，供后台上传）
 COPY client ./client
 RUN npm run build
 
@@ -28,7 +28,7 @@ COPY package.json ./
 COPY server ./server
 COPY --from=builder /app/client/dist ./client/dist
 
-# 运行时数据目录与只读图标目录；非 root 运行
+# 运行时数据目录与图标目录（宿主卷需 uid 1000 可写）；非 root 运行
 RUN mkdir -p /app/data /app/assets/icons && chown -R node:node /app
 
 USER node

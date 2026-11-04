@@ -2,8 +2,8 @@
 # 以下规则只对 toupiao 成立，写进根 .gitignore 会变成全站规则、可能误伤其他子项目。
 # 通用规则（node_modules/、dist/、.env、.DS_Store 等）仍由根 .gitignore 负责。
 
-# 20 张 Logo 候选图：用户明确要求不入库（2026-11-04）。
-# 本地开发与 Docker 通过 ICONS_DIR / 只读卷使用；部署到新机器时手工上传。
+# 31 张 Logo 候选图：用户明确要求不入库（2026-11-04）。
+# 本地开发与 Docker 通过 ICONS_DIR / 可写卷使用；后台上传也只写宿主目录，部署时手工上传。
 # 目录里的 README.md 仍然入库，保证目录结构与说明在仓库中可见。
 /assets/icons/*.png
 

@@ -41,7 +41,7 @@ server/                       后端
 ├── db.js                     SQLite 打开、迁移、查询与事务
 ├── dingtalk-config.js        钉钉配置解析（DB > env）、AES-256-GCM 加解密、校验
 ├── auth.js                   会话签名、钉钉 OAuth2、鉴权
-├── icons.js                  扫描图标目录、静态图响应
+├── icons.js                  扫描/重扫图标目录、上传校验与落盘、静态图响应
 ├── http.js                   JSON/cookie/静态文件/安全响应头等工具
 ├── rate-limit.js             登录与投票的简单内存限流
 ├── state.js                  聚合前台/后台状态（票数、排名、我的投票）
@@ -49,7 +49,7 @@ server/                       后端
     ├── public.js             /api/health、/api/state
     ├── auth.js               /api/auth/login|callback|logout
     ├── votes.js              /api/votes/*
-    └── admin.js              /api/admin/*（含 /dingtalk 配置）
+    └── admin.js              /api/admin/*（含 /dingtalk 配置与 /icons 上传）
 
 client/                       Vue 前台与后台（同一个 SPA）
 ├── index.html
@@ -66,7 +66,7 @@ client/                       Vue 前台与后台（同一个 SPA）
 
 tests/                        node:test 接口/集成测试
 e2e/                          Playwright-core 端到端脚本与截图产物（gitignore）
-assets/icons/                 20 张候选图（**不入库**）
+assets/icons/                 31 张候选图（**不入库**，可后台上传）
 data/                         运行时 SQLite（不入库）
 docs/                         部署与钉钉接入手册
 ```
@@ -120,10 +120,23 @@ docs/                         部署与钉钉接入手册
 ### 图标
 
 - 目录 `ICONS_DIR`，文件名 `^(\d{2})_(.+)\.png$`，按编号排序；`id` 为两位编号。
-- 只按**启动时扫描到的白名单**提供图片，禁止按请求路径直接拼文件系统路径。
+- 只按**内存白名单**提供图片，禁止按请求路径直接拼文件系统路径。启动时扫描一次；
+  后台上传成功后 `createIconStore.reload()` 重扫同一目录并原子替换白名单，立即生效，无需重启。
+- **后台上传**：`POST /api/admin/icons?filename=<urlencoded>`，body 为原始 PNG 字节，
+  `Content-Type: image/png`，不走 multipart、不引入运行时依赖。
+  - 仅管理员（未登录 401、员工 403）；沿用全局 Origin 校验。
+  - 单文件 ≤ 5 MB（413），空文件/非 PNG/只有签名或截断的 PNG 结构（400）。
+  - 文件名取原始 basename，去 `.png` 与可选 `NN_` 前缀，移除路径分隔符/控制字符/`..`、
+    去首尾空白，≤ 40 字；为空用「新图标」。
+  - 编号取 01–99 中当前未使用的最小值；满 99 返回 409 `ICON_LIMIT_REACHED`。
+  - 落盘 `NN_名称.png`：先写同目录临时文件再 rename，失败清理；分配编号与落盘在
+    模块级 Promise 队列中串行执行，并发上传不会撞号。
+  - 上传只新增，不删除/重命名/替换；投票关闭时仍可上传，已有票数不受影响。
 - 目录缺失或为空不崩溃：服务照常启动，`/api/state` 返回空列表并带警告标记，
-  后台显示明确提示。
-- 图标不提交 git；Docker 以只读卷挂载。**构建镜像不 COPY 图标。**
+  后台显示明确提示。目录不存在时上传会尝试 `mkdir -p`，失败/不可写返回 500 并提示
+  `ICONS_DIR` 权限。
+- 图标不提交 git；Docker 以**可写**卷挂载（后台上传写入宿主目录），宿主
+  `assets/icons` 需对容器内 uid 1000 可写。**构建镜像不 COPY 图标。**
 
 ### 前端
 
@@ -142,6 +155,8 @@ docs/                         部署与钉钉接入手册
 - 独立口令会话；管理员角色不可投票（投票接口返回 403）。
 - 后台「钉钉登录」面板可配置站点地址/AppKey/AppSecret/corpId，回调地址只读可复制；
   AppSecret 留空表示保留，保存后立即生效。
+- 后台「上传图标」面板在钉钉配置之后、图标表之前：多选 PNG、逐张上传、逐张状态、
+  成功数提示；上传中禁用，成功后 emit `uploaded` 让后台刷新。显示「当前 X / 99」。
 - 重置必须请求体 `{ "confirm": "RESET" }`，只删 `votes`，保留 `users`。
 - CSV 以 UTF-8 BOM 输出，列：姓名、图标编号、图标名称、投票时间（本地时区 ISO 字符串）。
 
@@ -164,7 +179,9 @@ npm run test:e2e     # 构建并启动临时服务 + 本机 Chrome 跑端到端
 - 单容器，多阶段：builder 里 `npm ci && npm run build`；runtime 只带 `server/` 与
   `client/dist`，以 `node` 用户运行，`EXPOSE 3001`。
 - 应用端口 3001（仅本机），对外 HTTPS 3100 由共享 Caddy 提供（见 `deploy/ports.md`）。
-- 卷：`./data:/app/data`、`./assets/icons:/app/assets/icons:ro`。
+- 卷：`./data:/app/data`、`./assets/icons:/app/assets/icons`（可写，供后台上传）。
+- 宿主 `data` 与 `assets/icons` 都需对容器内 uid 1000 可写
+  （`sudo chown -R 1000:1000 data assets/icons`）。
 - 健康检查：`GET /api/health`。
 - 启动只要求 `ADMIN_PASSWORD` / `SESSION_SECRET`；钉钉配置推荐在后台填写，
   `DINGTALK_*` / `PUBLIC_BASE_URL` 只是可选引导值。

@@ -7,7 +7,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, { method = 'GET', body, headers = {} } = {}) {
+async function request(path, { method = 'GET', body, rawBody, headers = {} } = {}) {
   const options = {
     method,
     credentials: 'same-origin',
@@ -16,7 +16,9 @@ async function request(path, { method = 'GET', body, headers = {} } = {}) {
       ...headers,
     },
   };
-  if (body !== undefined) {
+  if (rawBody !== undefined) {
+    options.body = rawBody;
+  } else if (body !== undefined) {
     options.headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
   }
@@ -57,6 +59,12 @@ export const api = {
   adminLogout: () => request('/api/admin/logout', { method: 'POST' }),
   getAdminState: () => request('/api/admin/state'),
   getVoters: () => request('/api/admin/voters'),
+  uploadIcon: (file) =>
+    request(`/api/admin/icons?filename=${encodeURIComponent(file.name || '')}`, {
+      method: 'POST',
+      rawBody: file,
+      headers: { 'Content-Type': 'image/png' },
+    }),
   setVotingOpen: (votingOpen) =>
     request('/api/admin/settings', { method: 'PUT', body: { votingOpen } }),
   getDingTalkSettings: () => request('/api/admin/dingtalk'),

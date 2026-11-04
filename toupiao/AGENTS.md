@@ -5,9 +5,9 @@
 
 ## 这是什么
 
-Esonitro（深圳君柔科技）的 **Logo 评选投票站**：员工用钉钉登录后，在 20 个 Logo 候选稿中
+Esonitro（深圳君柔科技）的 **Logo 评选投票站**：员工用钉钉登录后，在 31 个 Logo 候选稿中
 最多投 5 个（可随时取消/改投）；前台实时公开排名与票数；管理员在后台查看投票明细、
-开关投票、导出 CSV、重置投票。
+上传候选图标、开关投票、导出 CSV、重置投票。
 
 ## 档位
 
@@ -31,10 +31,10 @@ toupiao/
 ├── Dockerfile / .dockerignore
 ├── docker-compose.yml
 ├── constitution/             ← mission / roadmap / tech-stack
-├── specs/                    ← README + _template + spec-001/spec-002
+├── specs/                    ← README + _template + spec-001/spec-002/spec-003
 ├── .ai/                      ← decisions / workflows / prompts / rules
 ├── docs/                     ← 部署与钉钉接入操作手册
-├── assets/icons/             ← 20 张候选图（**不入库**，见下）
+├── assets/icons/             ← 31 张候选图（**不入库**，可后台上传，见下）
 ├── client/                   ← Vue 3 前台（Vite 构建）
 │   ├── index.html
 │   ├── vite.config.js
@@ -56,8 +56,12 @@ Vue 3 + Vue Router 4 + Vite 7；Node.js 24 内置 `http` + `node:sqlite`，零�
 - **投票规则是产品硬约束**：每人最多 **5 个不同图标**，每个图标最多 1 票，投票期间可随时取消；
   不允许同一图标重复投票，不允许超过 5 票。上限在服务端强制，前端只做提示。
 - **图标不入库**（用户 2026-11-04 明确要求）。`assets/icons/*.png` 被项目 `.gitignore` 忽略；
-  本地构建与 Docker 通过只读目录挂载提供图标。**部署到新机器前必须手工上传这 20 张图**，
-  否则页面无图可投。详见 `assets/icons/README.md`。
+  本地构建与 Docker 通过**可写**目录挂载提供图标，管理员可在 `/admin` 直接上传 PNG
+  （单张 ≤ 5 MB，编号 01–99，最多 99 张）。上传只写宿主 `assets/icons/`，不写数据库；
+  保存后重扫白名单立即生效，无需重启。**部署到新机器前仍须手工上传这 31 张图**，
+  或启动后由管理员逐张上传；宿主目录需对容器内 uid 1000 可写
+  （`sudo chown -R 1000:1000 assets/icons`）。否则页面无图可投。详见
+  `assets/icons/README.md`。
 - **登录只有钉钉扫码 OAuth2**。没有 mock 登录、开发者模式或测试登录入口；
   未配置钉钉时服务照常启动，员工点登录提示“登录暂未开放”。
 - **钉钉配置后台化**：站点地址、AppKey、AppSecret、corpId 存在 `settings` 表，

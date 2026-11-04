@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  copyFileSync,
   createWriteStream,
   existsSync,
   mkdirSync,
@@ -9,6 +10,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -21,7 +23,8 @@ import { startFakeDingTalk } from './fake-dingtalk.mjs';
 /**
  * Playwright-core 端到端验收（使用系统 Chrome，不下载浏览器）。
  *
- * 流程：后台配置钉钉登录 → 假钉钉 OAuth2 跳转/回调 → 登录 → 投 5 票 →
+ * 流程：后台登录 → 上传 PNG（临时 ICONS_DIR，前台免重启出现）→ 非 PNG 被拒 →
+ *      后台配置钉钉登录 → 假钉钉 OAuth2 跳转/回调 → 登录 → 投 5 票 →
  *      第 6 票被拒 → 取消 → 改投 → 刷新保持 → 后台明细 → 关闭/重开 →
  *      CSV → 重置 → UI 清理与安全自查。
  */
@@ -124,7 +127,28 @@ async function main() {
   if (build.status !== 0) throw new Error('前端构建失败');
 
   const fake = await startFakeDingTalk();
-  const dataDir = mkdtempSync(join(tmpdir(), 'toupiao-e2e-'));
+  // E2E 只往临时 ICONS_DIR 上传，避免在仓库 assets/icons 留下 32_*.png。
+  const tempRoot = mkdtempSync(join(tmpdir(), 'toupiao-e2e-'));
+  const dataDir = join(tempRoot, 'data');
+  const iconsDir = join(tempRoot, 'icons');
+  mkdirSync(dataDir, { recursive: true });
+  mkdirSync(iconsDir, { recursive: true });
+  const sourcePngs = readdirSync(ICONS_DIR)
+    .filter((name) => name.endsWith('.png'))
+    .sort();
+  for (const name of sourcePngs) {
+    copyFileSync(join(ICONS_DIR, name), join(iconsDir, name));
+  }
+  assert.equal(
+    readdirSync(iconsDir).filter((name) => name.endsWith('.png')).length,
+    pngCount,
+    '临时图标目录应包含全部候选图',
+  );
+  const expectedIconCount = pngCount + 1;
+  const uploadPngPath = join(tempRoot, 'E2E 新图标.png');
+  copyFileSync(join(ICONS_DIR, sourcePngs[0]), uploadPngPath);
+  const badImagePath = join(tempRoot, 'not-a-png.txt');
+  writeFileSync(badImagePath, 'this is not a png');
   const port = await getFreePort();
   const base = `http://127.0.0.1:${port}`;
   const serverLogPath = join(ARTIFACTS, 'server.log');
@@ -143,7 +167,7 @@ async function main() {
       ADMIN_PASSWORD: E2E_ADMIN_PASSWORD,
       SESSION_SECRET: `e2e-session-secret-${'x'.repeat(40)}`,
       DATA_DIR: dataDir,
-      ICONS_DIR,
+      ICONS_DIR: iconsDir,
       PORT: String(port),
       NODE_ENV: 'test',
       TRUST_PROXY: '0',
@@ -171,11 +195,10 @@ async function main() {
     const page = await userContext.newPage();
     page.setDefaultTimeout(15000);
 
-    step('A1 未登录浏览 20 个图标与实时票数，状态栏/hero 无重复入口');
+    step(`A1 未登录浏览 ${pngCount} 个图标与实时票数，状态栏/hero 无重复入口`);
     await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
     await page.locator('.icon-grid .icon-card').first().waitFor();
     assert.equal(await page.locator('.icon-grid .icon-card').count(), pngCount);
-    assert.equal(await page.locator('.icon-grid .icon-card').count(), 20);
     await page.waitForFunction(() => {
       const image = document.querySelector('.icon-card img');
       return Boolean(image && image.complete && image.naturalWidth > 0);
@@ -238,6 +261,100 @@ async function main() {
       (await normalizedText(adminPage.locator('.control-panel .status-pill'))).includes('进行中'),
       true,
       '管理端投票开关面板应有状态 pill',
+    );
+
+    step(`A2 后台上传 1 张 PNG：图标数 ${pngCount} → ${expectedIconCount}，前台免重启出现且 0 票`);
+    await adminPage.locator('#icon-upload-input').waitFor({ state: 'attached' });
+    await adminPage.setInputFiles('#icon-upload-input', uploadPngPath);
+    await adminPage.getByRole('button', { name: '开始上传' }).click();
+    await adminPage
+      .locator('[data-testid="icon-upload-result"]', { hasText: '成功上传 1 张' })
+      .waitFor();
+    await adminPage.waitForFunction(
+      (expected) =>
+        document
+          .querySelector('[data-testid="icon-count"]')
+          ?.textContent.replace(/\s+/g, ' ')
+          .trim() === expected,
+      `当前 ${expectedIconCount} / 99`,
+    );
+    await adminPage.waitForFunction(
+      (expected) =>
+        document.querySelectorAll('[data-testid="admin-icons-table"] tbody tr').length === expected,
+      expectedIconCount,
+    );
+    const adminStateAfterUpload = await adminPage.evaluate(async () =>
+      (await fetch('/api/admin/state')).json(),
+    );
+    assert.equal(adminStateAfterUpload.iconCount, expectedIconCount);
+    const uploadedAdminIcon = adminStateAfterUpload.icons.find(
+      (icon) => icon.name === 'E2E 新图标',
+    );
+    assert.ok(uploadedAdminIcon, '上传后后台 state 应立即包含新图标');
+    assert.equal(uploadedAdminIcon.count, 0, '新图标初始 0 票');
+
+    // 用户页仍停在旧数据上；bringToFront 触发可见性刷新，再等 5 秒轮询把新图标带出来。
+    await page.bringToFront();
+    await page.waitForFunction(
+      (expected) => document.querySelectorAll('.icon-grid .icon-card').length === expected,
+      expectedIconCount,
+      { timeout: 20000 },
+    );
+    const uploadedCard = page.locator('.icon-card', { hasText: 'E2E 新图标' });
+    await uploadedCard.waitFor();
+    assert.equal(await normalizedText(uploadedCard.locator('.icon-meta')), '0 票');
+    // 新图标在列表末尾，懒加载图片需要先滚入视口。
+    await uploadedCard.scrollIntoViewIfNeeded();
+    await page.waitForFunction(
+      () => {
+        const card = [...document.querySelectorAll('.icon-card')].find((node) =>
+          node.textContent.includes('E2E 新图标'),
+        );
+        const image = card?.querySelector('img');
+        return Boolean(image && image.complete && image.naturalWidth > 0);
+      },
+      undefined,
+      { timeout: 10000 },
+    );
+    await page.screenshot({
+      path: join(ARTIFACTS, 'vote-icon-uploaded.png'),
+      fullPage: true,
+    });
+    await adminPage.bringToFront();
+    await adminPage.screenshot({
+      path: join(ARTIFACTS, 'admin-icon-upload.png'),
+      fullPage: true,
+    });
+    assert.equal(
+      (await adminPage.locator('#icon-upload-input').getAttribute('accept')),
+      'image/png',
+    );
+    assert.notEqual(
+      await adminPage.locator('#icon-upload-input').getAttribute('multiple'),
+      null,
+      '上传输入必须支持多选',
+    );
+
+    step('A4 非 PNG 上传被拒：显示可读错误且不增加图标');
+    await adminPage.setInputFiles('#icon-upload-input', badImagePath);
+    await adminPage.getByRole('button', { name: '开始上传' }).click();
+    await adminPage
+      .locator('[data-testid="icon-upload-result"]', { hasText: '成功上传 0 张' })
+      .waitFor();
+    const failedUploadStatus = adminPage.locator('[data-testid="icon-upload-file-status"].is-error');
+    await failedUploadStatus.waitFor();
+    assert.match(await failedUploadStatus.innerText(), /PNG/);
+    const stateAfterBadUpload = await adminPage.evaluate(async () =>
+      (await fetch('/api/admin/state')).json(),
+    );
+    assert.equal(stateAfterBadUpload.iconCount, expectedIconCount, '非法上传不能增加图标');
+    await adminPage.waitForFunction(
+      (expected) =>
+        document
+          .querySelector('[data-testid="icon-count"]')
+          ?.textContent.replace(/\s+/g, ' ')
+          .trim() === expected,
+      `当前 ${expectedIconCount} / 99`,
     );
 
     step('F6 后台填写钉钉配置并保存');
@@ -520,7 +637,7 @@ async function main() {
     assert.equal((await page.locator('[data-testid="my-votes-count"]').innerText()).trim(), '0/5');
     await page.locator('.user-name', { hasText: 'E2E 测试员' }).waitFor();
     const metas = await page.locator('.icon-meta').allInnerTexts();
-    assert.equal(metas.length, 20);
+    assert.equal(metas.length, expectedIconCount);
     for (const meta of metas) {
       assert.match(meta.replace(/\s+/g, ' ').trim(), /^0 票$/, '重置后 0 票卡片不应显示排名');
     }
@@ -588,7 +705,7 @@ async function main() {
       process.exitCode = 1;
     }
 
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(tempRoot, { recursive: true, force: true });
   }
 }
 

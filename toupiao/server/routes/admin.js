@@ -9,10 +9,12 @@ import {
   applySecurityHeaders,
   csvDocument,
   getClientIp,
+  readBodyBuffer,
   readJsonBody,
   sendJson,
   timingSafeEqualString,
 } from '../http.js';
+import { MAX_ICON_BYTES, saveUploadedIcon } from '../icons.js';
 import {
   buildAdminState,
   buildVoters,
@@ -94,6 +96,51 @@ export async function updateDingtalk(ctx) {
   const body = (await readJsonBody(req, config.bodyLimit)) ?? {};
   const settings = saveDingTalkSettings(store, body, { config, logger });
   sendJson(res, 200, settings);
+}
+
+/**
+ * POST /api/admin/icons?filename=<urlencoded>，body 为原始 PNG 字节。
+ * 保存后立即重扫图标白名单，前台下一次轮询即可看到；无需重启。
+ */
+export async function uploadIcon(ctx) {
+  requireAdmin(ctx.req, ctx.config);
+  const { req, res, url, config, iconStore, logger } = ctx;
+
+  const contentType = req.headers['content-type'];
+  const isPng =
+    typeof contentType === 'string' &&
+    contentType.split(';')[0].trim().toLowerCase() === 'image/png';
+  if (!isPng) {
+    req.resume();
+    throw new HttpError(400, 'INVALID_IMAGE', '仅支持 PNG 图片');
+  }
+
+  let buffer;
+  try {
+    buffer = await readBodyBuffer(req, MAX_ICON_BYTES);
+  } catch (error) {
+    if (error instanceof HttpError && error.code === 'PAYLOAD_TOO_LARGE') {
+      throw new HttpError(413, 'PAYLOAD_TOO_LARGE', '图片不能超过 5 MB');
+    }
+    throw error;
+  }
+  if (buffer.length === 0) {
+    throw new HttpError(400, 'INVALID_IMAGE', '请选择要上传的 PNG 图片');
+  }
+
+  const added = await saveUploadedIcon({
+    dir: config.iconsDir,
+    buffer,
+    originalName: url.searchParams.get('filename') ?? '',
+    logger,
+  });
+  iconStore.reload({ logger });
+  sendJson(res, 200, {
+    ok: true,
+    added: [added],
+    total: iconStore.icons.length,
+    iconsAvailable: iconStore.available,
+  });
 }
 
 /** PUT /api/admin/settings {votingOpen} */

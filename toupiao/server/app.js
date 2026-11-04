@@ -26,6 +26,7 @@ const STATIC_ROUTES = {
   '/api/admin/state': { GET: adminRoutes.state },
   '/api/admin/voters': { GET: adminRoutes.voters },
   '/api/admin/settings': { PUT: adminRoutes.settings },
+  '/api/admin/icons': { POST: adminRoutes.uploadIcon },
   '/api/admin/dingtalk': { GET: adminRoutes.getDingtalk, PUT: adminRoutes.updateDingtalk },
   '/api/admin/reset': { POST: adminRoutes.reset },
   '/api/admin/export.csv': { GET: adminRoutes.exportCsv },

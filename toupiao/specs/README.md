@@ -26,3 +26,4 @@ specs/
 |---|---|---|
 | spec-001 | MVP Logo 投票 | PASS（2026-11-04，独立验收；非阻塞建议见 `acceptance.md`） |
 | spec-002 | 钉钉配置后台化与 UI 整改 | PASS（2026-11-04，独立验收；见 `spec-002-dingtalk-admin-config/acceptance.md`） |
+| spec-003 | 后台手动上传候选图标 | PASS（2026-11-04，独立验收；首轮 3 项反例修复后复验；见 `spec-003-icon-upload/acceptance.md`） |

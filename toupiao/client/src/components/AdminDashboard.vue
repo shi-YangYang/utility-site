@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue';
 import DingTalkSettings from './DingTalkSettings.vue';
+import IconUpload from './IconUpload.vue';
 
 const props = defineProps({
   admin: { type: Object, required: true },
@@ -124,6 +125,8 @@ function confirmReset() {
 
     <DingTalkSettings />
 
+    <IconUpload :count="admin.iconCount" @uploaded="$emit('refresh')" />
+
     <div class="admin-columns">
       <section class="panel" aria-labelledby="admin-icons-title">
         <div class="panel-head">
@@ -131,7 +134,7 @@ function confirmReset() {
           <span class="muted">共 {{ admin.totalVotes }} 票</span>
         </div>
         <div class="table-wrap">
-          <table class="data-table">
+          <table class="data-table" data-testid="admin-icons-table">
             <thead>
               <tr>
                 <th scope="col">排名</th>

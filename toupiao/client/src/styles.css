@@ -1594,6 +1594,110 @@ input::placeholder {
   flex-wrap: wrap;
 }
 
+/* ---------- 图标上传 ---------- */
+
+.icon-upload-panel {
+  margin-bottom: 22px;
+  border-left: 4px solid var(--success);
+}
+
+.upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.upload-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.upload-controls .empty-hint {
+  margin: 0;
+}
+
+.upload-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upload-file {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfcff;
+}
+
+.upload-file-name {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-file-size {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.upload-file-status {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.upload-file-status.is-uploading {
+  color: var(--primary);
+}
+
+.upload-file-status.is-success {
+  color: var(--success);
+}
+
+.upload-file-status.is-error {
+  color: var(--danger);
+}
+
+.upload-summary {
+  margin: 12px 0 0;
+  color: var(--success);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.upload-summary.has-error {
+  color: var(--danger);
+}
+
 /* ---------- 响应式 ---------- */
 
 @media (max-width: 1180px) {
