@@ -1717,6 +1717,7 @@ input::placeholder {
   .layout {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
     gap: 18px;
   }
 
@@ -1937,6 +1938,11 @@ input::placeholder {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  [data-testid='admin-icons-table'] th:nth-child(4),
+  [data-testid='admin-icons-table'] td:nth-child(4) {
+    display: none;
+  }
+
   .callback-row {
     flex-direction: column;
     align-items: stretch;
@@ -1955,6 +1961,11 @@ input::placeholder {
 
   .stat-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-testid='admin-icons-table'] th:nth-child(1),
+  [data-testid='admin-icons-table'] td:nth-child(1) {
+    display: none;
   }
 }
 

@@ -96,7 +96,7 @@ async function startUpload() {
           当前 {{ count }} / {{ MAX_ICONS }}
         </span>
       </div>
-      <span class="muted">PNG，单张 ≤ 5 MB</span>
+      <span class="muted">PNG ≤ 5 MB</span>
     </div>
 
     <div class="upload-controls">

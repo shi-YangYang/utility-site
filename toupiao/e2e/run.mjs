@@ -523,6 +523,16 @@ async function main() {
       mobileLayout.scrollWidth <= mobileLayout.innerWidth + 1,
       `375px 不应横向滚动（${mobileLayout.scrollWidth} > ${mobileLayout.innerWidth}）`,
     );
+    const mobilePanels = await page.evaluate(() => {
+      const layout = document.querySelector('.layout').getBoundingClientRect().width;
+      const myVotes = document.querySelector('.my-votes').getBoundingClientRect().width;
+      const loginButton = document.querySelector('.my-votes .btn')?.getBoundingClientRect().width ?? 0;
+      return { layout, myVotes, loginButton };
+    });
+    assert.ok(mobilePanels.myVotes >= mobilePanels.layout - 2, '移动端「我的投票」应占满整行');
+    if (mobilePanels.loginButton > 0) {
+      assert.ok(mobilePanels.loginButton > 240, '移动端登录按钮应占满面板宽度');
+    }
     assert.ok(await page.locator('[data-testid="my-votes-count"]').isVisible());
     const mobileStatusBar = await normalizedText(page.locator('.status-bar'));
     assert.equal(mobileStatusBar.includes('剩余'), false);
