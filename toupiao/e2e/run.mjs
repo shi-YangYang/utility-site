@@ -316,7 +316,7 @@ async function main() {
     const authorizeQuery = authorizeRequests[0].query;
     assert.equal(authorizeQuery.client_id, E2E_APP_KEY);
     assert.equal(authorizeQuery.response_type, 'code');
-    assert.equal(authorizeQuery.scope, 'openid');
+    assert.equal(authorizeQuery.scope, 'openid corpid');
     assert.equal(authorizeQuery.prompt, 'consent');
     assert.equal(authorizeQuery.corpId, E2E_CORP_ID);
     assert.equal(authorizeQuery.redirect_uri, `${base}/api/auth/callback`);

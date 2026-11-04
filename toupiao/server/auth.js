@@ -153,7 +153,7 @@ export function buildAuthorizeUrl(settings, state, config) {
   );
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('client_id', settings.appKey);
-  url.searchParams.set('scope', 'openid');
+  url.searchParams.set('scope', settings.corpId ? 'openid corpid' : 'openid');
   url.searchParams.set('state', state);
   url.searchParams.set('prompt', 'consent');
   if (settings.corpId) url.searchParams.set('corpId', settings.corpId);

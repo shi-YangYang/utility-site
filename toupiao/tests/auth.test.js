@@ -138,7 +138,7 @@ test('钉钉授权跳转参数正确（含 state cookie 和 corpId）', async (t
   assert.equal(params.get('redirect_uri'), 'https://vote.example.com/api/auth/callback');
   assert.equal(params.get('response_type'), 'code');
   assert.equal(params.get('client_id'), 'ding-app-key');
-  assert.equal(params.get('scope'), 'openid');
+  assert.equal(params.get('scope'), 'openid corpid');
   assert.equal(params.get('prompt'), 'consent');
   assert.equal(params.get('corpId'), 'corp-123');
   assert.ok((params.get('state') ?? '').length >= 20);
@@ -159,6 +159,7 @@ test('钉钉授权 URL 未配置 corpId 时不带 corpId', async (t) => {
   const response = await client.get('/api/auth/login');
   const location = new URL(response.headers.get('location'));
   assert.equal(location.searchParams.has('corpId'), false);
+  assert.equal(location.searchParams.get('scope'), 'openid');
 });
 
 test('钉钉回调：state 不匹配不建立会话，错误参数可读', async (t) => {
