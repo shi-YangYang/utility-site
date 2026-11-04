@@ -14,10 +14,13 @@ RUN npm run build
 # ---- 运行阶段：Node 托管静态文件 + API，零运行时 npm 依赖 ----
 FROM node:24-alpine AS runtime
 
+RUN apk add --no-cache tzdata
+
 ENV NODE_ENV=production \
     PORT=3001 \
     DATA_DIR=/app/data \
-    ICONS_DIR=/app/assets/icons
+    ICONS_DIR=/app/assets/icons \
+    TZ=Asia/Shanghai
 
 WORKDIR /app
 

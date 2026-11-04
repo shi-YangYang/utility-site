@@ -11,9 +11,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      # toupiao 对外 HTTPS 端口（已在 ../ports.md 登记）。
-      # Caddyfile 里还需有对应站点段；域名就绪前该端口不会提供内容。
-      - "3100:3100"
+      # toupiao 走 443 共享入口，不再额外映射 3100。
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

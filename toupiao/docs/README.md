@@ -12,7 +12,7 @@
 - 31 张候选图（不在 git 里，需单独上传；也可启动后由管理员在后台逐张上传）。
 
 端口已登记在 [`../../deploy/ports.md`](../../deploy/ports.md)：应用 `3001`（仅本机），
-对外 HTTPS `3100`（共享 Caddy）。若服务器上 3001 被占用，改 `HOST_PORT` 并同步端口表。
+对外 HTTPS 走共享 Caddy 的 `443`。若服务器上 3001 被占用，改 `HOST_PORT` 并同步端口表。
 
 ## 2. 钉钉应用配置
 
@@ -117,8 +117,7 @@ docker compose logs -f
 
 ## 6. 反向代理与 HTTPS
 
-在 `deploy/proxy/Caddyfile` 增加（先确认 3100 已在 `ports.md` 登记，
-并在 `deploy/proxy/docker-compose.yml` 取消 3100 映射的注释）：
+在 `deploy/proxy/Caddyfile` 增加（单项目直接使用 443；无需额外端口）：
 
 ```caddy
 https://vote.example.com {

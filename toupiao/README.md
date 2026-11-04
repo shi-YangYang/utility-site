@@ -157,7 +157,7 @@ docker compose logs -f
 
 ## 部署与端口
 
-- 应用端口：`3001`（仅本机）；对外 HTTPS 端口：`3100`（共享 Caddy）。
+- 应用端口：`3001`（仅本机）；对外 HTTPS 走共享 Caddy 的 `443`（不再占用 3100）。
 - 需要域名的真实钉钉登录见 `docs/README.md`；Caddy 路由示例：
 
   ```caddy
