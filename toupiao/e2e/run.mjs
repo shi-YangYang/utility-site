@@ -146,17 +146,16 @@ async function main() {
     await page.locator('.icon-grid .icon-card').first().waitFor();
     assert.equal(await page.locator('.icon-grid .icon-card').count(), pngCount);
     assert.equal(await page.locator('.icon-grid .icon-card').count(), 20);
-    assert.match(await page.locator('.dev-badge').innerText(), /开发模式/);
     await page.waitForFunction(() => {
       const image = document.querySelector('.icon-card img');
       return Boolean(image && image.complete && image.naturalWidth > 0);
     });
     assert.equal((await page.locator('[data-testid="total-votes"]').innerText()).trim(), '0');
 
-    step('A3 未登录点投票 → 登录弹窗（开发模式标识）');
+    step('A3 未登录点投票 → 登录弹窗');
     await clickIcon(page, '01');
     await page.locator('.login-dialog').waitFor();
-    assert.match(await page.locator('.login-dialog').innerText(), /开发模式/);
+    await page.locator('#mock-name').waitFor();
     await page.screenshot({ path: join(ARTIFACTS, 'login-dialog.png'), fullPage: true });
 
     step('A3 mock 输入姓名登录');

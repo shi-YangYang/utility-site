@@ -20,7 +20,7 @@ const actionText = computed(() => {
   if (props.pending) return '提交中…';
   if (props.selected) return props.votingOpen ? '点击取消' : '已选（投票已结束）';
   if (!props.votingOpen) return '投票已结束';
-  if (props.limitReached) return '已满 5 票，先取消一个';
+  if (props.limitReached) return '已满 5 票';
   return '点击投票';
 });
 

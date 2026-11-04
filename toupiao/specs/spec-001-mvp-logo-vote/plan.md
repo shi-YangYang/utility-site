@@ -46,7 +46,7 @@
 | `src/api.js` | `request()` 统一处理 401/403/409/429/503，导出各接口 |
 | `src/composables/usePolling.js` | 可见性感知轮询 |
 | `src/composables/useToast.js` | 轻量提示队列 |
-| `src/components/AppHeader.vue` | 标题、登录态、退出、开发模式徽标 |
+| `src/components/AppHeader.vue` | 标题、登录态、退出、导航 |
 | `src/components/IconCard.vue` | 图片、名称、票数、排名、投票/取消按钮、禁用态 |
 | `src/components/LoginDialog.vue` | 钉钉按钮 / mock 姓名表单，错误展示 |
 | `src/components/VoteSummary.vue` | x/5、剩余票数、已选缩略图、取消 |

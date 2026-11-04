@@ -1,7 +1,6 @@
 <script setup>
 defineProps({
   user: { type: Object, default: null },
-  authMode: { type: String, default: 'dingtalk' },
   isAdmin: { type: Boolean, default: false },
 });
 
@@ -18,10 +17,6 @@ defineEmits(['logout']);
           <span>Logo 评选投票</span>
         </span>
       </router-link>
-
-      <span v-if="authMode === 'mock'" class="dev-badge" title="仅限本地开发与验收使用">
-        开发模式
-      </span>
 
       <nav class="header-actions" aria-label="账号与导航">
         <template v-if="isAdmin">

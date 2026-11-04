@@ -16,8 +16,6 @@ const selectedIcons = computed(() =>
     .map((id) => props.icons.find((icon) => icon.id === id))
     .filter((icon) => Boolean(icon)),
 );
-
-const remaining = computed(() => Math.max(0, props.maxVotes - props.myVotes.length));
 </script>
 
 <template>
@@ -28,11 +26,6 @@ const remaining = computed(() => Math.max(0, props.maxVotes - props.myVotes.leng
     </div>
 
     <template v-if="user">
-      <p class="remaining">
-        还可投 <strong>{{ remaining }}</strong> 个图标
-        <span v-if="!votingOpen" class="muted">（投票已结束）</span>
-      </p>
-
       <ul v-if="selectedIcons.length" class="selected-list">
         <li v-for="icon in selectedIcons" :key="icon.id">
           <img :src="icon.url" :alt="icon.name" loading="lazy" />
@@ -48,13 +41,10 @@ const remaining = computed(() => Math.max(0, props.maxVotes - props.myVotes.leng
           </button>
         </li>
       </ul>
-      <p v-else class="empty-hint">还没有投票，点击候选图标开始吧。</p>
-
-      <p v-if="!votingOpen" class="frozen-hint">投票已冻结，已投记录保持不变。</p>
+      <p v-else class="empty-hint">还没有投票</p>
     </template>
 
     <template v-else>
-      <p class="empty-hint">登录后才能投票；现在可以先浏览候选与实时票数。</p>
       <button type="button" class="btn btn-primary btn-block" @click="$emit('login')">
         登录参与投票
       </button>

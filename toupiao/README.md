@@ -27,7 +27,7 @@ npm run dev
 - 后台：<http://localhost:5173/admin>
 - 后端 API：<http://localhost:3001/api/health>
 
-mock 模式下，前台登录框会显示“开发模式”标识，输入任意姓名即可登录，用来跑通投票流程。
+mock 模式下输入任意姓名即可登录，用来跑通投票流程。
 **mock 只允许本地开发使用，上线必须是 `AUTH_MODE=dingtalk`。**
 
 ## 配置

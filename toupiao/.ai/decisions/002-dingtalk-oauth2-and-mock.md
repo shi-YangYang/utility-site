@@ -12,8 +12,9 @@
 - 主路径采用钉钉 **OAuth2 扫码/账号登录**：`/api/auth/login` 跳转
   `login.dingtalk.com/oauth2/auth`，回调校验 state 后用 code 换 token，
   再取用户 unionId/nick/avatar；配置了 corpId 时在授权 URL 带 `corpId`。
-- 本地开发增加 `AUTH_MODE=mock`：输入姓名即建立稳定假身份，界面显著标注“开发模式”；
-  `dingtalk` 模式下 mock 接口不可用。
+- 本地开发增加 `AUTH_MODE=mock`：输入姓名即建立稳定假身份；mock 仅用于开发，
+  不在用户界面展示“开发模式”等开发者说明（2026-11-04 用户要求），
+  由服务端启动日志、README 与部署文档提示；`dingtalk` 模式下 mock 接口不可用。
 - 管理端不使用钉钉身份，改用独立 `ADMIN_PASSWORD` + 签名会话，避免把管理员权限
   绑定到某个钉钉账号的配置上。
 

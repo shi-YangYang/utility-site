@@ -25,10 +25,6 @@ function submit() {
   <section class="admin-login panel" aria-labelledby="admin-login-title">
     <p class="eyebrow">Esonitro · 管理后台</p>
     <h1 id="admin-login-title">管理员登录</h1>
-    <p class="modal-desc">
-      管理后台使用独立口令，与员工钉钉账号无关。口令由部署者在
-      <code>.env</code> 的 <code>ADMIN_PASSWORD</code> 中配置。
-    </p>
 
     <form class="login-form" @submit.prevent="submit">
       <label for="admin-password">管理口令</label>
@@ -47,9 +43,6 @@ function submit() {
       </button>
     </form>
 
-    <p class="field-hint">
-      连续输错会被限流（每 IP 5 分钟最多 10 次），请确认口令后重新尝试。
-    </p>
     <router-link to="/" class="back-link">← 返回投票页</router-link>
   </section>
 </template>

@@ -66,17 +66,13 @@ function confirmReset() {
 <template>
   <div class="admin-dashboard">
     <div v-if="!admin.iconsAvailable" class="warning-banner warning-icons" role="status">
-      <strong>图标目录为空</strong>：前台暂时没有可投票的候选图。请把
-      <code>NN_名称.png</code> 放进 <code>assets/icons/</code> 后重启服务。
+      <strong>暂无候选图标</strong>
     </div>
 
     <section class="admin-hero">
       <div>
         <p class="eyebrow">Esonitro · 管理后台</p>
         <h1>投票管理</h1>
-        <p class="hero-desc">
-          查看实时统计与投票人明细、开关投票、导出 CSV。管理员账号不能参与投票。
-        </p>
       </div>
       <div class="admin-hero-actions">
         <button type="button" class="btn" :disabled="busy" @click="$emit('refresh')">
@@ -91,33 +87,26 @@ function confirmReset() {
       <article class="stat-card">
         <span class="stat-label">总票数</span>
         <strong class="stat-value" data-testid="admin-total-votes">{{ admin.totalVotes }}</strong>
-        <span class="stat-hint">每票对应一个图标</span>
       </article>
       <article class="stat-card">
         <span class="stat-label">参与人数</span>
         <strong class="stat-value" data-testid="admin-voters-count">{{ admin.votersCount }}</strong>
-        <span class="stat-hint">注册用户 {{ admin.userCount }} 人</span>
       </article>
       <article class="stat-card">
         <span class="stat-label">候选图标</span>
         <strong class="stat-value">{{ admin.iconCount }}</strong>
-        <span class="stat-hint">每人最多 {{ admin.maxVotes }} 票</span>
       </article>
       <article class="stat-card">
         <span class="stat-label">投票状态</span>
         <span class="status-pill" :class="{ closed: !admin.votingOpen }">
           {{ admin.votingOpen ? '进行中' : '已关闭' }}
         </span>
-        <span class="stat-hint">{{ admin.votingOpen ? '员工可以投票与取消' : '所有修改已冻结' }}</span>
       </article>
     </section>
 
     <section class="panel control-panel">
       <div>
         <h2>投票开关</h2>
-        <p class="muted">
-          关闭后，新增投票与取消投票都会立即被拒绝，票数继续公开展示；重新开启后恢复。
-        </p>
       </div>
       <button
         type="button"
@@ -170,7 +159,7 @@ function confirmReset() {
           </table>
         </div>
         <p v-if="!admin.icons.length" class="empty-hint">
-          图标目录为空，先上传候选图并重启服务。
+          暂无候选图标
         </p>
       </section>
 
@@ -202,9 +191,6 @@ function confirmReset() {
           </select>
         </label>
       </div>
-      <p class="privacy-note">
-        此区域包含投票人姓名，仅管理员可见。请勿截图公开分享。
-      </p>
 
       <div v-if="sortedVoters.length" class="table-wrap">
         <table class="data-table voters-table">
@@ -251,17 +237,9 @@ function confirmReset() {
     <section class="panel danger-zone" aria-labelledby="reset-title">
       <div>
         <h2 id="reset-title">重置投票</h2>
-        <p class="muted">
-          清空所有投票记录（保留用户账号）。操作不可恢复，建议先导出 CSV 并备份数据库。
-        </p>
       </div>
       <button type="button" class="btn btn-danger" @click="openReset">重置投票…</button>
     </section>
-
-    <footer class="admin-footer">
-      <span>站点地址：{{ admin.publicBaseUrl }}</span>
-      <span>登录方式：{{ admin.authMode === 'mock' ? 'mock（开发模式）' : '钉钉扫码' }}</span>
-    </footer>
 
     <Teleport to="body">
       <div v-if="resetOpen" class="modal-backdrop" @click.self="closeReset">
@@ -277,7 +255,7 @@ function confirmReset() {
           </button>
           <h2 id="reset-dialog-title">确认重置投票</h2>
           <p>
-            这将删除 <strong>{{ admin.totalVotes }}</strong> 条投票记录，且无法恢复。
+            删除 <strong>{{ admin.totalVotes }}</strong> 条投票记录，无法恢复。
             请输入大写 <code>RESET</code> 确认。
           </p>
           <label for="reset-confirm">确认词</label>

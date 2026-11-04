@@ -50,7 +50,5 @@ function barWidth(icon) {
         </span>
       </li>
     </ol>
-
-    <p class="rank-note">排名按票数降序，票数相同并列。</p>
   </section>
 </template>

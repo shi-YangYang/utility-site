@@ -84,14 +84,7 @@ function submit() {
             ×
           </button>
 
-          <p v-if="authMode === 'mock'" class="dev-notice">
-            <strong>开发模式</strong>：输入任意姓名即可模拟登录，仅限本地开发与验收；线上必须使用钉钉登录。
-          </p>
-
           <h2 id="login-title">登录后参与投票</h2>
-          <p class="modal-desc">
-            一人最多投 5 个不同图标。前台只公开票数与排名，不会展示投票人姓名。
-          </p>
 
           <form v-if="authMode === 'mock'" class="login-form" @submit.prevent="submit">
             <label for="mock-name">你的姓名</label>
@@ -105,7 +98,6 @@ function submit() {
               placeholder="例如：张三"
               :disabled="busy"
             />
-            <p class="field-hint">1–20 个字符；同名会视为同一位员工。</p>
             <p v-if="errorText" class="form-error" role="alert">{{ errorText }}</p>
             <button type="submit" class="btn btn-primary btn-block" :disabled="busy">
               {{ busy ? '登录中…' : '进入投票' }}
@@ -113,9 +105,7 @@ function submit() {
           </form>
 
           <div v-else class="dingtalk-block">
-            <p>使用钉钉扫码登录，授权成功后会自动回到投票页。</p>
             <a class="btn btn-primary btn-block" :href="loginHref">使用钉钉登录</a>
-            <p class="field-hint">在钉钉内置浏览器中同样可用；若无法打开，请复制链接到系统浏览器。</p>
           </div>
         </div>
       </div>

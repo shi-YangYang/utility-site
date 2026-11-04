@@ -154,14 +154,8 @@ async function handleLogout() {
   <div class="page">
     <AppHeader
       :user="state?.user ?? null"
-      :auth-mode="state?.authMode ?? 'dingtalk'"
       @logout="handleLogout"
     />
-
-    <div v-if="state?.authMode === 'mock'" class="dev-banner" role="status">
-      <strong>开发模式</strong>
-      <span>mock 登录已启用，输入任意姓名即可投票，仅限本地开发与验收；线上必须使用钉钉登录。</span>
-    </div>
 
     <main class="page-main">
       <section v-if="initialLoading" class="loading-grid" aria-busy="true" aria-label="正在加载候选图标">
@@ -179,10 +173,6 @@ async function handleLogout() {
           <div class="hero-copy">
             <p class="eyebrow">Esonitro · 品牌决策</p>
             <h1>选出你心中的 Logo</h1>
-            <p class="hero-desc">
-              从 {{ state.icons.length || 20 }} 个候选稿中最多选择 5 个，可随时取消或改投。
-              票数与排名实时公开，投票人姓名只在管理后台可见。
-            </p>
           </div>
           <div class="hero-stats" aria-label="投票概况">
             <div class="hero-stat">
@@ -202,7 +192,6 @@ async function handleLogout() {
 
         <div v-if="!state.votingOpen" class="closed-banner" role="status">
           <strong>投票已结束</strong>
-          <span>结果仍然可以查看，但新增与取消投票已冻结。</span>
         </div>
 
         <section class="status-bar" aria-label="我的投票状态">
@@ -215,9 +204,7 @@ async function handleLogout() {
           <span class="status-item">
             剩余 <strong>{{ Math.max(0, state.maxVotes - state.myVotes.length) }}</strong> 票
           </span>
-          <span v-if="state.user" class="status-item muted">当前身份：{{ state.user.nick }}</span>
-          <button v-else type="button" class="link-btn" @click="openLogin">登录后投票</button>
-          <span class="status-updated">每 5 秒自动刷新</span>
+          <button v-if="!state.user" type="button" class="link-btn" @click="openLogin">登录后投票</button>
         </section>
 
         <div class="layout">
@@ -229,11 +216,7 @@ async function handleLogout() {
               </div>
 
               <div v-if="!state.iconsAvailable || !state.icons.length" class="empty-panel">
-                <h3>尚未上传候选图标</h3>
-                <p>
-                  请把 20 张 <code>NN_名称.png</code> 放进服务器的
-                  <code>assets/icons/</code> 目录，然后重启服务或重新部署。
-                </p>
+                <h3>暂无候选图标</h3>
               </div>
 
               <div v-else class="icon-grid">
@@ -265,13 +248,6 @@ async function handleLogout() {
             <Leaderboard :icons="state.icons" />
           </aside>
         </div>
-
-        <footer class="page-footer">
-          <p>
-            票数每 5 秒更新 · 前台不公开投票人姓名 ·
-            <router-link to="/admin">管理后台</router-link>
-          </p>
-        </footer>
       </template>
     </main>
 

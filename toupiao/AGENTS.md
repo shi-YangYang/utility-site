@@ -60,8 +60,10 @@ Vue 3 + Vue Router 4 + Vite 7；Node.js 24 内置 `http` + `node:sqlite`，零�
   否则页面无图可投。详见 `assets/icons/README.md`。
 - **钉钉凭据只进环境变量**：`DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID` /
   `SESSION_SECRET` / `ADMIN_PASSWORD` 一律不写进代码、不提交、不打印到日志。
-- **mock 登录只用于本地开发**。`AUTH_MODE=mock` 时页面必须显示醒目的“开发模式”标识；
+- **mock 登录只用于本地开发**。`AUTH_MODE=mock` 时服务端启动日志会明确警告；
   上线必须使用 `AUTH_MODE=dingtalk`，并配置真实的钉钉应用与回调地址。
+- **界面只给用户看**：不展示开发模式、实现说明或类似“票数如何公开”的解释性文案；
+  只保留用户需要的状态、操作与必要提示（2026-11-04 用户要求）。
 - **前台公开排名与票数**（用户 2026-11-04 决定）。前台**不得**公开投票人姓名；
   投票人明细只在管理员鉴权后可读。
 - **关闭投票即冻结**：关闭后新增与取消投票都返回明确错误，已投数据不变。
