@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import AppHeader from '../components/AppHeader.vue';
 import IconCard from '../components/IconCard.vue';
 import Leaderboard from '../components/Leaderboard.vue';
@@ -23,7 +23,26 @@ const loadError = ref('');
 const loginOpen = ref(false);
 const pendingIds = ref(new Set());
 const highlightedId = ref('');
+const searchQuery = ref('');
 let highlightTimer = null;
+
+const normalizedSearch = computed(() => searchQuery.value.trim().toLowerCase());
+
+const filteredIcons = computed(() => {
+  const icons = state.value?.icons ?? [];
+  const query = normalizedSearch.value;
+  if (!query) return icons;
+  return icons.filter(
+    (icon) =>
+      icon.name.toLowerCase().includes(query) ||
+      icon.id.includes(query) ||
+      `#${icon.id}`.includes(query),
+  );
+});
+
+function clearSearch() {
+  searchQuery.value = '';
+}
 
 onUnmounted(() => {
   if (highlightTimer) clearTimeout(highlightTimer);
@@ -31,9 +50,13 @@ onUnmounted(() => {
 
 /**
  * 从实时排行定位到候选卡：滚动到视口中间并短暂高亮。
- * 重复点击同一项会重置计时。
+ * 如果目标被搜索过滤掉，先清空搜索，等卡片渲染后再定位。
  */
-function focusIcon(id) {
+async function focusIcon(id) {
+  if (!filteredIcons.value.some((icon) => icon.id === id)) {
+    searchQuery.value = '';
+    await nextTick();
+  }
   const card = document.querySelector(`[data-icon-id="${id}"]`);
   if (!card) return;
   card.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -212,18 +235,56 @@ async function handleLogout() {
         <div class="layout">
           <div class="main-column">
             <section class="candidates" aria-labelledby="candidates-title">
-              <div class="section-heading">
-                <h2 id="candidates-title">候选 Logo</h2>
-                <span class="muted">{{ state.icons.length }} 个候选</span>
+              <div class="section-heading candidates-heading">
+                <div class="section-title">
+                  <h2 id="candidates-title">候选 Logo</h2>
+                  <span class="muted">
+                    <template v-if="normalizedSearch">
+                      {{ filteredIcons.length }} / {{ state.icons.length }} 个匹配
+                    </template>
+                    <template v-else>{{ state.icons.length }} 个候选</template>
+                  </span>
+                </div>
+
+                <label class="search-field">
+                  <span class="search-glyph" aria-hidden="true">⌕</span>
+                  <input
+                    v-model="searchQuery"
+                    type="search"
+                    autocomplete="off"
+                    placeholder="搜索名称或编号"
+                    aria-label="搜索候选图标"
+                    data-testid="icon-search"
+                    @keydown.esc="clearSearch"
+                  />
+                  <button
+                    v-if="searchQuery"
+                    type="button"
+                    class="search-clear"
+                    aria-label="清除搜索"
+                    data-testid="icon-search-clear"
+                    @click="clearSearch"
+                  >
+                    ×
+                  </button>
+                </label>
               </div>
 
               <div v-if="!state.iconsAvailable || !state.icons.length" class="empty-panel">
                 <h3>暂无候选图标</h3>
               </div>
 
+              <div
+                v-else-if="normalizedSearch && !filteredIcons.length"
+                class="empty-panel search-empty"
+              >
+                <h3>没有匹配的图标</h3>
+                <button type="button" class="btn" @click="clearSearch">清除搜索</button>
+              </div>
+
               <div v-else class="icon-grid">
                 <IconCard
-                  v-for="icon in state.icons"
+                  v-for="icon in filteredIcons"
                   :key="icon.id"
                   :icon="icon"
                   :selected="state.myVotes.includes(icon.id)"

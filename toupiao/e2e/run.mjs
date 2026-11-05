@@ -215,6 +215,24 @@ async function main() {
     assert.equal(initialPublicState.loginConfigured, false);
     assert.equal('authMode' in initialPublicState, false);
 
+    step('A1b 搜索候选图标：按编号过滤 / 无结果 / 清除');
+    const searchInput = page.getByTestId('icon-search');
+    await searchInput.fill('21');
+    await page.waitForFunction(
+      () => document.querySelectorAll('.icon-grid .icon-card').length === 1,
+    );
+    assert.equal(
+      await page.locator('.icon-grid .icon-card').getAttribute('data-icon-id'),
+      '21',
+    );
+    await searchInput.fill('不存在');
+    await page.locator('.search-empty').waitFor();
+    await page.getByTestId('icon-search-clear').click();
+    await page.waitForFunction(
+      (count) => document.querySelectorAll('.icon-grid .icon-card').length === count,
+      pngCount,
+    );
+
     step('A2 未配置钉钉时点登录 → 登录暂未开放');
     await clickIcon(page, '01');
     await page.locator('.toast', { hasText: '登录暂未开放' }).waitFor();
