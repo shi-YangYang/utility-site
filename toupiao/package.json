@@ -1,0 +1,24 @@
+{
+  "name": "toupiao",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Esonitro Logo 评选投票站：钉钉登录、每人最多 5 票、实时排名、后台管理",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "vite build --config client/vite.config.js",
+    "start": "node server/index.js",
+    "test": "node --test tests/*.test.js",
+    "test:e2e": "node e2e/run.mjs"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.10",
+    "playwright-core": "^1.64.1",
+    "vite": "^7.3.7",
+    "vue": "^3.5.44",
+    "vue-router": "^4.6.4"
+  }
+}

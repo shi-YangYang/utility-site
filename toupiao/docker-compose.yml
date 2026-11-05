@@ -1,0 +1,28 @@
+services:
+  toupiao:
+    build: .
+    image: utility-site/toupiao:latest
+    container_name: toupiao
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATA_DIR: /app/data
+      ICONS_DIR: /app/assets/icons
+    ports:
+      # 默认对宿主所有网卡开放；生产建议 BIND_HOST=172.17.0.1，只让 Caddy 访问
+      - "${BIND_HOST:-0.0.0.0}:${HOST_PORT:-3001}:3001"
+    volumes:
+      # SQLite 数据（可写；宿主目录属主建议 1000，见 docs/README.md）
+      - ./data:/app/data
+      # 候选图不在镜像里；可写挂载，后台上传直接写入宿主目录
+      # （宿主 assets/icons 需对容器内 uid 1000 可写，见 docs/README.md）
+      - ./assets/icons:/app/assets/icons
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

@@ -10,8 +10,9 @@
 - **已提供**：端口分配表（[`ports.md`](./ports.md)）、部署脚本
   （[`scripts/deploy.sh`](./scripts/deploy.sh)）、反向代理 compose 与
   Caddyfile 模板（[`proxy/`](./proxy/)）。
-- **待定**：服务器地址与域名、是否启用 HTTPS 与证书来源
-  （见根 `AGENTS.md`「全站待定」）。模板使用占位域名，未配置前不会签发证书。
+- **已定（2026-11-04）**：一台腾讯云 Ubuntu 26.04 服务器（`106.54.224.173`）；
+  `toupiao` 已通过共享 Caddy 的 `443` + Let's Encrypt **IP 证书**上线
+  （6 天短周期，服务器 systemd timer 自动续期）。域名仍未确定。
 
 ## 怎么用
 
@@ -67,8 +68,8 @@ cp Caddyfile.example Caddyfile
 
 | 文件 | 触发 | 做什么 |
 |---|---|---|
-| `ci.yml` | PR 到 `main` | 只校验本次改动到的子项目：`deploy` 做 shell/compose 校验；`recording` 做 `node --check`、compose 校验与镜像构建；`screenshot-ledger` 做 `tsc` 与 Jest 单测；不做全量重验 |
-| `cd.yml` | **只在手动触发时运行**（Actions → CD → Run workflow） | 从下拉里选择目标（`recording` / `proxy` / `all`），交给 `deploy/scripts/deploy.sh` 执行；**合并到 `main` 不会自动部署**；未配置凭据时跳过并提示。**新增可部署子项目时，把项目名加进 `cd.yml` 的 `inputs.project.options`** |
+| `ci.yml` | PR 到 `main` | 只校验本次改动到的子项目：`deploy` 做 shell/compose 校验；`recording` 做 `node --check`、compose 校验与镜像构建；`screenshot-ledger` 做 `tsc` 与 Jest 单测；`toupiao` 做 `npm ci`、Vite 构建、`node:test` 与镜像构建；不做全量重验 |
+| `cd.yml` | **只在手动触发时运行**（Actions → CD → Run workflow） | 从下拉里选择目标（`recording` / `toupiao` / `proxy` / `all`），交给 `deploy/scripts/deploy.sh` 执行；**合并到 `main` 不会自动部署**；未配置凭据时跳过并提示。**新增可部署子项目时，把项目名加进 `cd.yml` 的 `inputs.project.options`** |
 
 **使用前需要在 GitHub 配置**（Settings → Secrets and variables → Actions）：
 
@@ -87,7 +88,11 @@ cp Caddyfile.example Caddyfile
 - 首次部署前按 [`ports.md`](./ports.md) 确认端口未被占用。
 
 未配置凭据时，运行 CD 会跳过部署并在 Actions 里给出提示，不会失败。
-部署方式：Actions → CD → Run workflow → 选择目标（如 `recording` / `proxy` / `all`）。
+部署方式：Actions → CD → Run workflow → 选择目标（如 `recording` / `toupiao` / `proxy` / `all`）。
+
+> `toupiao` 的候选图不入库：首次部署或换机器后，需要先把 20 张图上传到
+> 服务器 `toupiao/assets/icons/`，否则站点能启动但没有图标。详见
+> [`../toupiao/docs/README.md`](../toupiao/docs/README.md)。
 
 ## 多个子项目并存（端口区分）
 

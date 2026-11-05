@@ -23,6 +23,7 @@ on:
         default: recording
         options:
           - recording
+          - toupiao
           - proxy
           - all
 

@@ -1,0 +1,15 @@
+node_modules/
+data/
+assets/icons/*.png
+.env
+.env.*
+client/dist/
+e2e/artifacts/
+.git/
+tests/
+specs/
+docs/
+constitution/
+.ai/
+*.log
+.DS_Store
