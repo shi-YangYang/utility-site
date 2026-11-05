@@ -5,7 +5,7 @@
 
 ## 这是什么
 
-Esonitro（深圳君柔科技）的 **Logo 评选投票站**：员工用钉钉登录后，在 31 个 Logo 候选稿中
+Esonitro（深圳君柔科技）的 **Logo 评选投票站**：员工用钉钉登录后，在 51 个 Logo 候选稿中
 最多投 5 个（可随时取消/改投）；前台实时公开排名与票数；管理员在后台查看投票明细、
 上传候选图标、开关投票、导出 CSV、重置投票。
 
@@ -34,7 +34,7 @@ toupiao/
 ├── specs/                    ← README + _template + spec-001/spec-002/spec-003
 ├── .ai/                      ← decisions / workflows / prompts / rules
 ├── docs/                     ← 部署与钉钉接入操作手册
-├── assets/icons/             ← 31 张候选图（**不入库**，可后台上传，见下）
+├── assets/icons/             ← 51 张候选图（**不入库**，可后台上传，见下）
 ├── client/                   ← Vue 3 前台（Vite 构建）
 │   ├── index.html
 │   ├── vite.config.js
@@ -58,7 +58,7 @@ Vue 3 + Vue Router 4 + Vite 7；Node.js 24 内置 `http` + `node:sqlite`，零�
 - **图标不入库**（用户 2026-11-04 明确要求）。`assets/icons/*.png` 被项目 `.gitignore` 忽略；
   本地构建与 Docker 通过**可写**目录挂载提供图标，管理员可在 `/admin` 直接上传 PNG
   （单张 ≤ 5 MB，编号 01–99，最多 99 张）。上传只写宿主 `assets/icons/`，不写数据库；
-  保存后重扫白名单立即生效，无需重启。**部署到新机器前仍须手工上传这 31 张图**，
+  保存后重扫白名单立即生效，无需重启。**部署到新机器前仍须手工上传这 51 张图**，
   或启动后由管理员逐张上传；宿主目录需对容器内 uid 1000 可写
   （`sudo chown -R 1000:1000 assets/icons`）。否则页面无图可投。详见
   `assets/icons/README.md`。

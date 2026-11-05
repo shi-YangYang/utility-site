@@ -66,7 +66,7 @@ client/                       Vue 前台与后台（同一个 SPA）
 
 tests/                        node:test 接口/集成测试
 e2e/                          Playwright-core 端到端脚本与截图产物（gitignore）
-assets/icons/                 31 张候选图（**不入库**，可后台上传）
+assets/icons/                 51 张候选图（**不入库**，可后台上传）
 data/                         运行时 SQLite（不入库）
 docs/                         部署与钉钉接入手册
 ```

@@ -9,7 +9,7 @@
 - 仅本机直接运行（`npm start` / `npm run dev`）需要 **Node.js 24+**；Docker 镜像已内置。
 - 一个可公网访问的 **HTTPS 地址**（域名或纯 IP；2026 起 Let's Encrypt 支持 IP 证书）。
 - 钉钉企业内部应用的 AppKey / AppSecret（可选 corpId）。
-- 31 张候选图（不在 git 里，需单独上传；也可启动后由管理员在后台逐张上传）。
+- 51 张候选图（不在 git 里，需单独上传；也可启动后由管理员在后台逐张上传）。
 
 端口已登记在 [`../../deploy/ports.md`](../../deploy/ports.md)：应用 `3001`（仅本机），
 对外 HTTPS 走共享 Caddy 的 `443`。若服务器上 3001 被占用，改 `HOST_PORT` 并同步端口表。
@@ -50,7 +50,7 @@ cp .env.example .env
 #   DINGTALK_CORP_ID=...（可选）
 chmod 600 .env
 
-# 上传 31 张图（在本地仓库根执行，或服务器上用 scp）
+# 上传 51 张图（在本地仓库根执行，或服务器上用 scp）
 # scp -r toupiao/assets/icons/*.png <用户>@<服务器>:/srv/utility-site/toupiao/assets/icons/
 
 mkdir -p data assets/icons
@@ -166,7 +166,7 @@ sudo docker run --rm \
 - [ ] 管理员能在 `/admin` 登录。
 - [ ] 「钉钉登录」面板状态为“已配置”，站点地址是对外 HTTPS。
 - [ ] 钉钉后台回调地址与面板复制的地址完全一致。
-- [ ] `assets/icons/` 有 31 张 PNG；`/api/state` 的 `iconsAvailable=true`。
+- [ ] `assets/icons/` 有 51 张 PNG；`/api/state` 的 `iconsAvailable=true`。
 - [ ] `data/` 与 `assets/icons/` 属主为 1000（可写），容器重启后投票仍在。
 - [ ] 后台「上传图标」上传 1 张 PNG 成功，图标数 +1，前台出现且 0 票（不重启）。
 - [ ] 上传非 PNG 显示可读错误；上传后刷新页面图标仍在。
@@ -213,7 +213,7 @@ db.exec(\"VACUUM INTO '/app/data/backup.db'\");
 | 钉钉报 redirect_uri 不匹配 | 钉钉后台回调地址 = 后台面板显示的回调地址，逐字符核对 |
 | 回跳后仍显示未登录 | 反代是否传 `X-Forwarded-Proto: https`；后台站点地址是否 https；cookie 是否被浏览器拦截 |
 | 后台显示“未配置”但环境变量有值 | 数据库里保存了无法解密的 AppSecret 密文会遮蔽环境变量；在后台重新填写 AppSecret，或删除对应 settings 键 |
-| 页面没有图标 | 把图片放进 `assets/icons/`（31 张）或在后台「上传图标」；看日志的扫描条数 |
+| 页面没有图标 | 把图片放进 `assets/icons/`（51 张）或在后台「上传图标」；看日志的扫描条数 |
 | 后台上传图标返回 500 | 宿主 `assets/icons` 对容器内 uid 1000 不可写；`sudo chown -R 1000:1000 assets/icons` |
 | 后台上传提示已达上限 | 编号 01–99 已用满 99 张；先由运维清理不需要的图片 |
 | 数据目录不可写 | `sudo chown -R 1000:1000 data assets/icons` |
