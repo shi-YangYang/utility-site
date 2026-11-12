@@ -217,13 +217,13 @@ async function main() {
 
     step('A1b 搜索候选图标：按编号过滤 / 无结果 / 清除');
     const searchInput = page.getByTestId('icon-search');
-    await searchInput.fill('21');
+    await searchInput.fill('01');
     await page.waitForFunction(
       () => document.querySelectorAll('.icon-grid .icon-card').length === 1,
     );
     assert.equal(
       await page.locator('.icon-grid .icon-card').getAttribute('data-icon-id'),
-      '21',
+      '01',
     );
     await searchInput.fill('不存在');
     await page.locator('.search-empty').waitFor();
@@ -483,9 +483,9 @@ async function main() {
     assert.equal((await page.locator('[data-testid="my-votes-count"]').innerText()).trim(), '5/5');
     assert.equal((await page.locator('[data-testid="total-votes"]').innerText()).trim(), '5');
     assert.equal((await page.locator('[data-testid="voters-count"]').innerText()).trim(), '1');
-    const zeroVoteMeta = await normalizedText(page.locator('[data-icon-id="20"] .icon-meta'));
+    const zeroVoteMeta = await normalizedText(page.locator('[data-icon-id="09"] .icon-meta'));
     assert.equal(zeroVoteMeta, '0 票', '0 票卡片只显示票数，不显示排名');
-    assert.equal(await page.locator('[data-icon-id="20"] .rank-badge').count(), 0);
+    assert.equal(await page.locator('[data-icon-id="09"] .rank-badge').count(), 0);
 
     step('B1 第 6 票被拒且数据不变');
     await clickIcon(page, '06');
@@ -661,7 +661,7 @@ async function main() {
     assert.equal(csvLines[0], '姓名,图标编号,图标名称,投票时间');
     assert.equal(csvLines.length, 6, '表头 + 5 条投票');
     assert.ok(csvText.includes('E2E 测试员'));
-    assert.ok(csvText.includes(',06,人机融合,'), 'CSV 应包含改投后的图标 06');
+    assert.ok(csvText.includes(',06,深蓝字标·圆体,'), 'CSV 应包含改投后的图标 06');
 
     step('C6 重置投票（必须输入 RESET）');
     await adminPage.getByRole('button', { name: '重置投票…' }).click();
