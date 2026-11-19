@@ -1,5 +1,8 @@
 # toupiao 运维与钉钉接入手册
 
+> 当前状态（2026-11-19）：已从生产服务器卸载，以下内容作为重新部署与运维参考。
+> 卸载前的项目、数据库、图标与备份已归档在服务器 `/srv/utility-site/backups/`。
+
 面向部署者。开发命令见 [`../README.md`](../README.md)，技术约束见
 [`../constitution/tech-stack.md`](../constitution/tech-stack.md)。
 
@@ -129,7 +132,7 @@ https://vote.example.com {
 - 有域名：Caddy 自动签发证书；域名解析到服务器，80/443 可达。
 - 只有 IP：可以用 **Let's Encrypt IP 证书**（2026-01 起 GA，有效期 6 天，
   必须使用 `shortlived` profile；自签证书只适合临时调试）。
-  当前生产部署即采用这种方式，证书路径
+  本次生产曾采用这种方式，证书路径
   `/etc/letsencrypt/live/<IP>/fullchain.pem` 与 `privkey.pem`。
 - 改完代理后执行 `./deploy/scripts/deploy.sh proxy`。
 

@@ -169,8 +169,8 @@ docker compose logs -f
   ```
 
 - 后台保存的站点地址必须是对外 HTTPS 地址（本地 `localhost` / `127.0.0.1` 允许 http 调试）。
-- 当前生产：`https://106.54.224.173/`，共享 Caddy `443` + Let's Encrypt IP 证书
-  （6 天短周期，服务器 systemd timer 自动续期）；详见 `docs/README.md`。
+- 该项目已于 **2026-11-19 从生产服务器卸载**；源码、数据、图标与备份保留，
+  重新部署时按 `docs/README.md` 操作。原生产地址 `https://106.54.224.173/` 已停止服务。
 
 ## 开发与测试
 

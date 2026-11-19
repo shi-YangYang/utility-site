@@ -10,9 +10,9 @@
 - **已提供**：端口分配表（[`ports.md`](./ports.md)）、部署脚本
   （[`scripts/deploy.sh`](./scripts/deploy.sh)）、反向代理 compose 与
   Caddyfile 模板（[`proxy/`](./proxy/)）。
-- **已定（2026-11-04）**：一台腾讯云 Ubuntu 26.04 服务器（`106.54.224.173`）；
-  `toupiao` 已通过共享 Caddy 的 `443` + Let's Encrypt **IP 证书**上线
-  （6 天短周期，服务器 systemd timer 自动续期）。域名仍未确定。
+- **已定（2026-11-04）**：一台腾讯云 Ubuntu 26.04 服务器（`106.54.224.173`）。
+  `toupiao` 已于 2026-11-19 卸载（项目目录、容器与证书续期 timer 已移除，备份保留）；
+  共享 Caddy 保留，当前 `80` 返回 404、`443` 无站点。域名仍未确定。
 
 ## 怎么用
 
